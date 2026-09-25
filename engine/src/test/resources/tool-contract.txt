@@ -1,0 +1,43 @@
+instructions:
+envx: local index of this project's Minecraft/Fabric environment (the live server's mods, Minecraft 1.20.1, Yarn names).
+Use it instead of unzipping jars, running javap, searching Gradle caches or decompiling by hand.
+find/outline first; source for code (Class.a,b fetches several members at once); refs/mixins/check_mixins for callers and injections.
+Add mod:<id> to a query to search inside specific mods. Answers are size-capped and state what they cover.
+Server crashes, log errors and failed mixins: env filter=errors[:text] (grep scope=logs for raw lines). Pack updates: env filter=diff:<old>..
+
+tool env: Environment summary (versions, snapshot age, history); filter=a,b describes mods; diff:A..B compares pack versions and what changed for the current project; errors[:text] summarizes server log errors and crashes.
+  filter (string): Mod id/name substrings, comma-separated; or diff:<from>..<to>; or errors[:text]
+  env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot
+
+tool find: Find classes/members by Yarn, intermediary or stack-frame name (LivingEntity.tick, class_1309.method_5773) or wildcard (*Tick*); mod:<id> alone describes a mod.
+  query (string, required): Name, wildcard or keyword; add mod:<id>[,<id>] to search inside mods
+  env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot
+
+tool outline: Members of a class incl. inherited matches for filter (Yarn + runtime names, signatures, lines), or mod:<id> details.
+  target (string, required): Class name or mod:<id>
+  filter (string): Only members containing this (searches superclasses too)
+  env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot
+
+tool source: Decompiled Yarn-named source of Class.member or Class.a,b,c (Minecraft or any mod), or lines=a-b of the class.
+  target (string, required): Class.member[,member...] or Class
+  lines (string): Line range a-b
+  env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot
+
+tool refs: Call sites of Class.member across Minecraft and all mods, plus overriders; for a class, which classes use it and how.
+  target (string, required): Class.member or Class; add mod:<id> to limit to users in those mods
+  env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot
+
+tool mixins: Mixins declared on a class or Class.method (kind, @At, priority, cancellable, mod version); mod:<id> alone lists that mod's injections.
+  target (string, required): Class or Class.method; add mod:<id> to limit to those mods
+  includeAccessors (boolean): Also list @Accessor/@Invoker
+  env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot
+
+tool check_mixins: Validate a project's built mixins against the environment and list other mods injecting at the same methods.
+  project (string): Project directory; default: working directory
+  env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot
+
+tool grep: Regex search over the server's configs/datapacks and loaded mods' data files (scope: config, resources, source, logs).
+  pattern (string, required): Java regex, case-insensitive; add mod:<id> to limit to those mods
+  scope (string): config,resources,source,logs
+  path (string): Only paths containing this
+  env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot

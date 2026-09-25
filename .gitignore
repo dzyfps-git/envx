@@ -1,0 +1,27 @@
+# Build output
+engine/.gradle/
+engine/build/
+**/out/
+
+# Machine-specific settings (one codebase; personal paths stay local, ADR 0010)
+CLAUDE.local.md
+bench/local.json
+docs/*.local.md
+
+# Local-only analysis output (may contain paths from private sessions)
+bench/results/
+# The owner's benchmark (questions, keys, findings, runbook) and golden tests describe a private server: local only.
+bench/expected/
+bench/questions.md
+bench/findings.md
+bench/RUNBOOK.md
+engine/src/test/java/dev/envx/GoldenIndexTest.java
+
+# Editors / OS
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+
+# Python
+__pycache__/

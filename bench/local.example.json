@@ -1,0 +1,7 @@
+{
+  "env": "myserver",
+  "workspaces": {
+    "workspace": "/path/to/a work folder",
+    "my-mod": "/path/to/a mod project whose built jar is deployed on the server"
+  }
+}

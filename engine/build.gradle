@@ -1,0 +1,45 @@
+plugins {
+    id 'application'
+}
+
+group = 'dev.envx'
+version = '1.0.0'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.fabricmc.net/' }
+}
+
+dependencies {
+    implementation 'org.ow2.asm:asm:9.9'
+    implementation 'org.ow2.asm:asm-tree:9.9'
+    implementation 'net.fabricmc:mapping-io:0.8.0'
+    implementation 'net.fabricmc:tiny-remapper:0.13.0'
+    implementation 'org.vineflower:vineflower:1.12.0'
+    implementation 'org.xerial:sqlite-jdbc:3.53.4.0'
+    implementation 'com.google.code.gson:gson:2.11.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'dev.envx.cli.Main'
+    applicationName = 'envx'
+    applicationDefaultJvmArgs = ['-Xss4m', '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8']
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+test {
+    useJUnitPlatform()
+    // Golden tests that need the local Loom cache / pack are skipped automatically when it is absent.
+    systemProperty 'envx.home', System.getProperty('envx.home', '')
+}
