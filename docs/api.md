@@ -31,11 +31,12 @@ Clients ignore fields they do not know. A breaking change would be `"api": 2`, s
   and the loader's resolved mod list) is the durable key: store it with anything you cache. `id` is a shorter handle
   valid in this data home. Requests take either `"snapshot": <id>` or `"fingerprint": "<sha256>"`; without either,
   the environment's current snapshot is used.
-- `modset`: sha256 over the loader's resolved list, as sorted lines `<mod id>@<version>` (mod ids lowercased; the
-  `java` entry left out). Snapshots that differ only in configs share a modset: the code is the same. Snapshots
-  from before envx 0.3 have neither (`null`) and never match. Other tools may list mods slightly differently (a
-  profiler's list can leave out entries the loader prints): `match` reports `missing`/`extra`, and the
-  normalization above is settled once against real lists before 1.1.
+- `modset`: sha256 over the mods the loader actually loaded, as sorted lines `<mod id>@<version>`, including
+  `java`, `minecraft` and `fabricloader`. This is the list whose size is the log's `Loading N mods` and what
+  `FabricLoader.getAllMods()` returns (spark's list, for example): the loader's printed tree also shows nested jars it
+  does not load on a dedicated server (client-only libraries, older duplicate copies), and envx leaves those out.
+  Snapshots that differ only in configs share a modset: the code is the same. Snapshots from before envx 0.3 have
+  neither (`null`) and never match.
 - Classes use runtime (intermediary) names, dotted or slashed (`net.minecraft.class_1309` or
   `net/minecraft/class_1309`); inner classes with `$`. Methods are name plus JVM descriptor. Answers are dotted.
 - Artifacts (jars) are identified by `sha256`, with `mod`, `version` and `file` for display.
@@ -50,7 +51,8 @@ not when the server started with it: envx sees a change only at its next sync.
 
 ### `match`
 Which snapshots ran this mod set?
-`{"op":"match","env":"myserver","mods":[["lithium","0.11.2"],["fabric-api","0.92.2+1.20.1"], …]}` →
+`{"op":"match","env":"myserver","mods":[["lithium","0.11.2"],["fabric-api","0.92.2+1.20.1"], …]}` (the full list
+as the caller has it, e.g. `getAllMods()`; envx normalizes) →
 - `{"status":"match","modset":"…","snapshots":[12,9]}`: every snapshot with exactly this resolved list;
 - `{"status":"none","modset":"…","closest":{"snapshot":12,"missing":[["x","1.0"]],"extra":[["y","2.0"]]}}`: no
   snapshot has it. `closest` is for display, never an answer: lookups against it are not about what ran.
