@@ -70,7 +70,9 @@ public final class GrepService {
             for (Object[] a : q.db().query("SELECT a.sha256, a.id FROM artifact a WHERE a.id IN (" + s.artifactSet() + ")",
                     rs -> new Object[]{rs.getString(1), rs.getLong(2)})) {
                 Path r = home.resolve("resources").resolve((String) a[0]);
-                if (Files.isDirectory(r) && s.includes((long) a[1])) roots.add(new Root(q.label((long) a[1]).split(" ")[0], r, List.of(), null));
+                if (!Files.isDirectory(r) || !s.includes((long) a[1])) continue;
+                String label = q.label((long) a[1]).split(" ")[0];
+                roots.add(Files.exists(Packs.of(r)) ? new Root(label, null, List.of(), null, Packs.of(r)) : new Root(label, r, List.of(), null));
             }
         }
         String coverage = "";
@@ -81,7 +83,7 @@ public final class GrepService {
                 Path r = SourceService.cacheDir(home, base, (String) a[1], (String) a[2]);
                 if (!Files.isDirectory(r) || !s.includes((long) a[0])) continue;
                 String label = q.label((long) a[0]).split(" ")[0];
-                Path pack = r.resolve(SourceService.PACK);
+                Path pack = Packs.of(r);
                 roots.add(Files.exists(pack) && Files.exists(r.resolve(SourceService.COMPLETE))
                         ? new Root(label, null, List.of(), null, pack) : new Root(label, r, List.of(), null, null));
             }
@@ -151,16 +153,19 @@ public final class GrepService {
         java.util.Set<String> hitFiles = new java.util.HashSet<>();
         for (Hit h : hits) hitFiles.add(h.file());
         List<String> namedOnly = new ArrayList<>(nameHits.stream().filter(f -> !hitFiles.contains(f)).sorted().toList());
+        String logs = scopes.contains("logs") || s.historical() || s.scoped() ? "" : logTally(s, pattern);
         if (hits.isEmpty() && !namedOnly.isEmpty()) {
             Out out = new Out(budget);
             out.force("No text matches for /" + regex + "/ in " + sc + s.scopeNote() + "; " + namedOnly.size() + " file(s) whose path matches:");
             for (String f : namedOnly) out.tallied("  " + f, f, "file");
+            if (!logs.isEmpty()) out.force(logs);
             return out.finish("read one with grep . --path <path>");
         }
         if (hits.isEmpty()) {
             return "No matches for /" + regex + "/ in " + sc + s.scopeNote() + (filter == null ? "" : " (path contains '" + filter + "')") + coverage + "."
                     + (scopes.contains("source") ? "" : " Decompiled code: add scope=source.")
-                    + (scopes.contains("resources") && !s.scoped() ? q.pastResources(s, pattern, filter) : "");
+                    + (scopes.contains("resources") && !s.scoped() ? q.pastResources(s, pattern, filter) : "")
+                    + (logs.isEmpty() ? "" : "\n" + logs);
         }
         // Grouped by file: the path once, then line numbers in order. Reading a whole file with "." stays compact
         // and in order (0.2.1 repeated a ~70-char path on every line and sorted line 1 after line 19).
@@ -183,10 +188,30 @@ public final class GrepService {
             out.force("also " + namedOnly.size() + " file(s) whose path matches but not their text: "
                     + String.join(", ", namedOnly.subList(0, Math.min(6, namedOnly.size()))) + (namedOnly.size() > 6 ? ", ..." : ""));
         }
+        if (!logs.isEmpty()) out.force(logs);
         return out.finish("narrow with path=<substring> or scope=config|resources|source|logs");
     }
 
     private record Hit(String file, int line, String text, boolean context) {}
+
+    /**
+     * When logs were not searched: how many lines of the server's current log (the local mirror, not refreshed here)
+     * match, so an agent learns envx has them instead of reading the server's log itself (trace report, 1.4.0).
+     */
+    private String logTally(Scope s, Pattern pattern) {
+        Path latest = dev.envx.env.LogMirror.dir(q.config().home(), s.env()).resolve("logs").resolve("latest.log");
+        try {
+            if (!Files.isRegularFile(latest)) return "";
+            long n;
+            try (Stream<String> lines = Files.lines(latest, StandardCharsets.UTF_8)) {
+                n = lines.filter(l -> pattern.matcher(l).find()).count();
+            }
+            return n == 0 ? "" : "also " + n + " matching line(s) in the server's current log: add scope=logs (it searches "
+                    + q.config().logDays + " days of logs and crash reports; env filter=errors groups the errors)";
+        } catch (IOException | java.io.UncheckedIOException e) {
+            return "";
+        }
+    }
 
     /** Matching lines collected before a search stops (answers show a few dozen; this bounds memory and time). */
     static final int MAX_HITS = 20_000;
@@ -262,7 +287,7 @@ public final class GrepService {
 
         Stream<Object[]> files() throws IOException {
             if (list != null) return list.stream();
-            if (pack != null) return SourceService.unpack(pack).stream();
+            if (pack != null) return Packs.read(pack).stream();
             return Files.walk(dir).filter(Files::isRegularFile)
                     .filter(f -> !f.getFileName().toString().startsWith(".") && !f.getFileName().toString().endsWith(".tmp")) // markers, writes in progress
                     .map(f -> new Object[]{dir.relativize(f).toString().replace('\\', '/'), f});

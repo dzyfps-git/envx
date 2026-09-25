@@ -43,4 +43,7 @@ experiment; the machine interface (`envx api` v1) hides the internals, so none o
 - Cold searches (1.4.0): on a spinning disk, the first search after the file cache was dropped took 21 s, nearly all
   of it opening 60,000 small files. Each complete folder now also holds one packed file of all its classes
   (`.pack`, about 220 MB for the whole pack), which `grep scope=source` reads instead: 4 s cold, under 1 s warm. A
-  search index is not needed at these sizes; revisit if the call log shows slow source searches.
+  search index is not needed at these sizes; revisit if the call log shows slow source searches. 1.4.1 packs each
+  jar's extracted resources the same way (in the same background run after a sync, past versions included): a cold
+  `grep scope=resources` over 94,000 files went from 55 s to 1.6 s. The server's config texts (under 1,000 files)
+  are still read one by one.

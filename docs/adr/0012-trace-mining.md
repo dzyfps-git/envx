@@ -34,5 +34,9 @@ help every mod, not one.
 - The first report on a real machine showed most rediscovery predates envx; since envx was first used, the largest
   remaining categories were mapping lookups, searching mod code and javap, and agents still listed mod folders or
   read the server's log directly right after envx answers. Those feed the next engine improvements.
+- First fixes (1.4.1): both needs were already covered (`env filter=<text>` matches jar file names; `grep scope=logs`
+  searches the mirrored logs), so the fix was discoverability: grep answers now say when the server's current log has
+  matching lines they did not search, and the filter's description names jar files. Timing the flagged searches also
+  showed that a cold resource search took 55 s on a spinning disk; resources are now packed (ADR 0011).
 - Findings are not stored yet. When the note store exists (knowledge design), mining feeds it proposals with
   evidence and provenance; until then this report is the whole feature.

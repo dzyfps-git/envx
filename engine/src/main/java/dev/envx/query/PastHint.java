@@ -108,6 +108,23 @@ final class PastHint {
                 }
                 Path root = q.config().home().resolve("resources").resolve(e.getValue());
                 if (!Files.isDirectory(root)) return;
+                if (Files.exists(Packs.of(root))) { // one file instead of thousands (ADR 0011)
+                    try {
+                        for (Object[] entry : Packs.read(Packs.of(root))) {
+                            String rel = (String) entry[0];
+                            if (pathFilter != null && !rel.toLowerCase(Locale.ROOT).contains(pathFilter)) continue;
+                            @SuppressWarnings("unchecked")
+                            List<String> lines = (List<String>) entry[1];
+                            if (pattern.matcher(rel).find() || lines.stream().anyMatch(l -> pattern.matcher(l).find())) {
+                                found.put(e.getKey(), rel);
+                                return;
+                            }
+                        }
+                    } catch (IOException | RuntimeException ignored) {
+                        // unreadable pack: skip this jar
+                    }
+                    return;
+                }
                 try (Stream<Path> walk = Files.walk(root)) {
                     for (Path f : (Iterable<Path>) walk.filter(Files::isRegularFile)::iterator) {
                         if (System.currentTimeMillis() > deadline) {

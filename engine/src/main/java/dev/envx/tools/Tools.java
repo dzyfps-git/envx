@@ -66,7 +66,7 @@ public final class Tools {
 
     static {
         add(new Tool("env", "Environment summary (versions, snapshot age, history); filter=a,b describes mods; diff:A..B compares pack versions and what changed for the current project; errors[:text] summarizes server log errors and crashes.",
-                List.of(new Param("filter", "Mod id/name substrings, comma-separated; or diff:<from>..<to>; or errors[:text]", false, "string"), ENV),
+                List.of(new Param("filter", "Mod id, name or jar file name substrings, comma-separated; or diff:<from>..<to>; or errors[:text]", false, "string"), ENV),
                 (c, s, a) -> c.q.env(s, str(a, "filter"), budget(a), a.has("_cwd") ? Path.of(str(a, "_cwd")) : null)));
         add(new Tool("find", "Find classes/members by Yarn, intermediary or stack-frame name (LivingEntity.tick, class_1309.method_5773) or wildcard (*Tick*); mod:<id> alone describes a mod.",
                 List.of(new Param("query", "Name, wildcard or keyword; add mod:<id>[,<id>] to search inside mods", true, "string"), ENV),

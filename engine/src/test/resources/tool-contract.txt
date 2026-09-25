@@ -6,7 +6,7 @@ Add mod:<id> to a query to search inside specific mods. Answers are size-capped 
 Server crashes, log errors and failed mixins: env filter=errors[:text] (grep scope=logs for raw lines). Pack updates: env filter=diff:<old>..
 
 tool env: Environment summary (versions, snapshot age, history); filter=a,b describes mods; diff:A..B compares pack versions and what changed for the current project; errors[:text] summarizes server log errors and crashes.
-  filter (string): Mod id/name substrings, comma-separated; or diff:<from>..<to>; or errors[:text]
+  filter (string): Mod id, name or jar file name substrings, comma-separated; or diff:<from>..<to>; or errors[:text]
   env (string): Environment; default: this directory's, current. name@<version> queries a past snapshot
 
 tool find: Find classes/members by Yarn, intermediary or stack-frame name (LivingEntity.tick, class_1309.method_5773) or wildcard (*Tick*); mod:<id> alone describes a mod.

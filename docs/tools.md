@@ -28,14 +28,14 @@ Answers show Yarn first and the runtime name in brackets.
 ## Tools
 | Tool | Main argument | Other parameters |
 |---|---|---|
-| `env` | `filter`: empty = summary (plus a project section in a mod project); `a,b` = mods (one exact id: its details, including the server files named for it, since 0.9.4); `diff:<from>..<to>` = what changed between pack versions and for the current project (`<to>` defaults to current); `errors[:text]` = server log errors, failed mixins and crashes (a date or range in the text, `09-10` or `09-01..09-10`, selects by time; since 0.9.3) | `env` |
+| `env` | `filter`: empty = summary (plus a project section in a mod project); `a,b` = mods by id, name or jar file name (one exact id: its details, including the server files named for it, since 0.9.4); `diff:<from>..<to>` = what changed between pack versions and for the current project (`<to>` defaults to current); `errors[:text]` = server log errors, failed mixins and crashes (a date or range in the text, `09-10` or `09-01..09-10`, selects by time; since 0.9.3) | `env` |
 | `find` | `query`: a name, a wildcard (`*Tick*`) or, with `mod:`, a keyword (then also the mod's calls to other code named like it and its data files mentioning it; since 0.9.4) | `env` |
 | `outline` | `target`: a class, or `mod:<id>` | `filter` (members containing it, inherited ones too), `env` |
 | `source` | `target`: `Class.member`, `Class.a,b,c` or `Class` | `lines` (`a-b`), `env` |
 | `refs` | `target`: `Class.member` (call sites and overriders; field uses marked read or write, with a count; calls through subclasses and the class's own uses included, since 1.2.0) or `Class` (who uses it) | `env` |
 | `mixins` | `target`: `Class`, `Class.method`, or `mod:<id>` | `includeAccessors`, `env` |
 | `check_mixins` | `project`: a mod project folder (default: working directory; needs a built jar) | `env` |
-| `grep` | `pattern`: a case-insensitive Java regex (in JSON files a match also shows its whole small object or array, lines marked `N-`; since 0.9.8) | `scope` (`config`, `resources`, `source`, `logs`; comma-separated), `path` (paths containing it; a `<mod>:<path>` copied from an answer works too), `env`. Files whose path matches the pattern are named even when their text does not (since 1.2.1). `source` searches the decompiled code of every loaded jar, named `<mod>:<path>`; while the background decompile after a sync is incomplete, answers say how many jars are done (since 1.3.0) |
+| `grep` | `pattern`: a case-insensitive Java regex (in JSON files a match also shows its whole small object or array, lines marked `N-`; since 0.9.8) | `scope` (`config`, `resources`, `source`, `logs`; comma-separated), `path` (paths containing it; a `<mod>:<path>` copied from an answer works too), `env`. Files whose path matches the pattern are named even when their text does not (since 1.2.1). Without `logs` in the scope, an answer adds how many lines of the server's current log match (since 1.4.1). `source` searches the decompiled code of every loaded jar, named `<mod>:<path>`; while the background decompile after a sync is incomplete, answers say how many jars are done (since 1.3.0) |
 
 ## Guarantees
 - Read-only toward every environment source. Only `envx env sync`, `env import` and `project index` write the index.

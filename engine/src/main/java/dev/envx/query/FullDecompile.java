@@ -57,10 +57,24 @@ public final class FullDecompile {
                 WHERE a.id IN (""" + s.artifactSet() + ") AND n > 0 ORDER BY a.kind<>'minecraft', n, a.id",
                 rs -> new Job(rs.getLong(1), null, rs.getString(2), rs.getString(3), rs.getInt(4)))) {
             Path dir = SourceService.cacheDir(q.config().home(), base, j.kind(), j.sha());
-            if (Files.exists(dir.resolve(SourceService.COMPLETE)) && Files.exists(dir.resolve(SourceService.PACK))) continue;
+            if (Files.exists(dir.resolve(SourceService.COMPLETE)) && Files.exists(Packs.of(dir))) continue;
             out.add(new Job(j.artifactId(), q.label(j.artifactId()), j.kind(), j.sha(), j.classes()));
         }
         return out;
+    }
+
+    /**
+     * Extracted-resource folders ({@code resources/<jar sha>}, any version) without a {@link Packs pack} yet. They never
+     * change, so each is packed once; past versions' folders are packed too (grep's past-version hint reads them).
+     */
+    static List<Path> unpackedResources(Path home) {
+        Path root = home.resolve("resources");
+        if (!Files.isDirectory(root)) return List.of();
+        try (var dirs = Files.list(root)) {
+            return dirs.filter(Files::isDirectory).filter(d -> !Files.exists(Packs.of(d))).sorted().toList();
+        } catch (IOException e) {
+            return List.of();
+        }
     }
 
     /**
@@ -69,19 +83,21 @@ public final class FullDecompile {
      */
     public static String maybeStart(Config config, String env) {
         try {
-            if (!config.decompileAll || running(config.home()).isPresent()) return null;
-            int jars;
-            int classes;
+            if (running(config.home()).isPresent()) return null;
+            int jars = 0;
+            int classes = 0;
+            int resources = unpackedResources(config.home()).size();
             try (Db db = Db.open(config.home(), true)) {
                 QueryService q = new QueryService(config, db);
                 Scope s = Scope.resolve(config, db, env, null);
                 FabricBase base = FabricBase.forEnv(config.home(), s.def().minecraft, s.def().mappings);
-                if (!base.isProvisioned()) return null;
-                List<Job> jobs = pending(q, s, base);
-                jars = jobs.size();
-                classes = jobs.stream().mapToInt(Job::classes).sum();
+                if (config.decompileAll && base.isProvisioned()) {
+                    List<Job> jobs = pending(q, s, base);
+                    jars = jobs.size();
+                    classes = jobs.stream().mapToInt(Job::classes).sum();
+                }
             }
-            if (jars == 0) return null;
+            if (jars == 0 && resources == 0) return null;
             List<String> cmd = new ArrayList<>(AutoSync.command(config, "decompile", env));
             // JVM options: a heap cap, and a CPU count the JVM sizes its own threads by
             cmd.addAll(1, List.of("-Xmx" + config.decompileMemoryMb + "m", "-XX:ActiveProcessorCount=" + Math.max(1, config.decompileThreads)));
@@ -89,8 +105,10 @@ public final class FullDecompile {
             Files.createDirectories(log.getParent());
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile())).start();
             p.getOutputStream().close();
-            return "decompiling " + jars + " jar(s) (" + classes + " classes) in the background at idle priority, "
-                    + config.decompileThreads + " threads; progress in " + log + "; stop with: envx decompile --stop";
+            String work = (jars > 0 ? "decompiling " + jars + " jar(s) (" + classes + " classes)" : "")
+                    + (jars > 0 && resources > 0 ? " and " : "") + (resources > 0 ? "packing " + resources + " resource folder(s)" : "");
+            return work + " in the background at idle priority, " + config.decompileThreads + " threads; progress in " + log
+                    + "; stop with: envx stop";
         } catch (Exception e) {
             return null;
         }
@@ -120,7 +138,9 @@ public final class FullDecompile {
                 base = FabricBase.forEnv(home, s.def().minecraft, s.def().mappings);
                 jobs = pending(q, s, base);
             }
-            log.println(Instant.now() + " " + jobs.size() + " jar(s) to decompile");
+            if (!config.decompileAll) jobs = List.of();
+            List<Path> resources = unpackedResources(home);
+            log.println(Instant.now() + " " + jobs.size() + " jar(s) to decompile, " + resources.size() + " resource folder(s) to pack");
             int done = 0;
             long t0 = System.nanoTime();
             for (Job j : jobs) {
@@ -128,7 +148,7 @@ public final class FullDecompile {
                 try {
                     Path dir = SourceService.cacheDir(home, base, j.kind(), j.sha());
                     if (Files.exists(dir.resolve(SourceService.COMPLETE))) { // decompiled by 1.3.0/1.3.1, before packs
-                        SourceService.pack(dir);
+                        SourceService.packJava(dir);
                         done++;
                         continue;
                     }
@@ -141,6 +161,18 @@ public final class FullDecompile {
                 }
             }
             log.printf(Locale.ROOT, "%s done: %d of %d jar(s) in %.0f s%n", Instant.now(), done, jobs.size(), (System.nanoTime() - t0) / 1e9);
+            long t1 = System.nanoTime();
+            int packed = 0;
+            for (Path d : resources) {
+                try {
+                    if (Packs.write(d, f -> true)) packed++;
+                } catch (IOException | RuntimeException e) {
+                    log.println(Instant.now() + " packing " + d.getFileName() + " failed: " + e);
+                }
+            }
+            if (!resources.isEmpty()) {
+                log.printf(Locale.ROOT, "%s packed %d of %d resource folder(s) in %.0f s%n", Instant.now(), packed, resources.size(), (System.nanoTime() - t1) / 1e9);
+            }
             return 0;
         } finally {
             Files.deleteIfExists(lockFile(home));

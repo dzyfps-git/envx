@@ -295,6 +295,30 @@ class FixtureEnvTest {
         dev.envx.query.FullDecompile.decompilePending(config, "fx", new java.io.PrintStream(log, true));
         assertTrue(log.toString().contains("1 jar(s) to decompile") && Files.exists(pack), log.toString());
         assertTrue(Files.readString(pack).contains("\u0001net/minecraft/entity/LivingEntity.java\n"));
+
+        // extracted resources are packed too, and grep answers the same from the pack
+        try (var dirs = Files.list(config.home().resolve("resources"))) {
+            assertTrue(dirs.allMatch(d -> Files.exists(d.resolve(".pack"))), "every resource folder packed");
+        }
+        JsonObject r = new JsonObject();
+        r.addProperty("pattern", "spawn_overrides");
+        r.addProperty("scope", "resources");
+        r.addProperty("path", "demo:data/demo/worldgen");
+        r.addProperty("env", "fx");
+        assertTrue(Tools.call(ctx, "grep", r, tmp).text().contains("1 match(es) in 1 file(s)"));
+        assertTrue(call("grep", "pattern", "camp", tmp).contains("demo:data/demo/worldgen/structure/camp.json"), "path matches from a pack");
+    }
+
+    @Test
+    void grepSaysWhenTheServersLogHasMatchesItDidNotSearch() { // trace report: agents read the server's log themselves
+        JsonObject a = new JsonObject();
+        a.addProperty("pattern", "fixture failure");
+        a.addProperty("scope", "logs");
+        a.addProperty("env", "fx");
+        assertTrue(Tools.call(ctx, "grep", a, tmp).text().contains("1 match(es)")); // also mirrors the log
+        String out = call("grep", "pattern", "fixture failure", tmp);
+        assertTrue(out.contains("also 1 matching line(s) in the server's current log: add scope=logs"), out);
+        assertFalse(call("grep", "pattern", "radius", tmp).contains("server's current log"), "no line when the log has none");
     }
 
     @Test
