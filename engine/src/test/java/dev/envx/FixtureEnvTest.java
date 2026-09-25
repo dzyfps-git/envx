@@ -108,6 +108,21 @@ class FixtureEnvTest {
     }
 
     @Test
+    void grepFindsFilesByNameAndTakesPathsAsShown() { // study: an advancement's id is its file name, not its text
+        String out = call("grep", "pattern", "camp", tmp);
+        assertTrue(out.startsWith("No text matches for /camp/"), out);
+        assertTrue(out.contains("demo:data/demo/worldgen/structure/camp.json"), out);
+        JsonObject a = new JsonObject();
+        a.addProperty("pattern", "spawn_overrides");
+        a.addProperty("scope", "resources");
+        a.addProperty("path", "demo:data/demo/worldgen"); // copied from an answer, label included
+        a.addProperty("env", "fx");
+        Tools.Result r = Tools.call(ctx, "grep", a, tmp);
+        assertTrue(r.text().contains("1 match(es) in 1 file(s)"), r.text());
+        assertFalse(call("grep", "pattern", ".", tmp).contains("whose path matches"), "a pattern matching anything names no files");
+    }
+
+    @Test
     void fieldUsesIncludeTheClassItselfAndSayReadOrWrite() { // study: agents grepped source for "who reads this field"
         String out = call("refs", "target", "LivingEntity.persistent", tmp);
         assertTrue(out.startsWith("uses of LivingEntity.persistent"), out);

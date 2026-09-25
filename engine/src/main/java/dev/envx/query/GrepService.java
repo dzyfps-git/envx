@@ -96,17 +96,23 @@ public final class GrepService {
 
         final Pattern pattern = p;
         List<Hit> hits = Collections.synchronizedList(new ArrayList<>());
+        // A file's name can be the answer when its text never repeats it (an advancement's id is its file name).
+        // A pattern that matches nonsense (".") would name every file, so names are only collected for real patterns.
+        boolean names = !pattern.matcher("").find() && !pattern.matcher("qzx~").find();
+        List<String> nameHits = Collections.synchronizedList(new ArrayList<>());
         roots.parallelStream().forEach(root -> {
             try (Stream<Object[]> walk = root.files()) {
                 walk.forEach(entry -> {
                     String rel = (String) entry[0];
                     Path f = (Path) entry[1];
                     String lower = rel.toLowerCase(Locale.ROOT);
-                    if (filter != null && !lower.contains(filter)) return;
+                    // Answers show files as <label>:<path>; a path copied from there filters too.
+                    if (filter != null && !lower.contains(filter) && !(root.label.toLowerCase(Locale.ROOT) + ":" + lower).contains(filter)) return;
                     if (!root.pathMustName.isEmpty() && root.pathMustName.stream().noneMatch(lower::contains)) return;
                     try {
                         List<String> lines = rel.endsWith(".gz") ? LogService.read(f) : Files.readAllLines(f, StandardCharsets.UTF_8);
                         List<Integer> matched = new ArrayList<>();
+                        if (names && pattern.matcher(rel).find()) nameHits.add(root.label + ":" + rel);
                         for (int i = 0; i < lines.size(); i++) {
                             if (pattern.matcher(lines.get(i)).find()) {
                                 matched.add(i);
@@ -133,6 +139,15 @@ public final class GrepService {
                 // directory vanished: skip
             }
         });
+        java.util.Set<String> hitFiles = new java.util.HashSet<>();
+        for (Hit h : hits) hitFiles.add(h.file());
+        List<String> namedOnly = new ArrayList<>(nameHits.stream().filter(f -> !hitFiles.contains(f)).sorted().toList());
+        if (hits.isEmpty() && !namedOnly.isEmpty()) {
+            Out out = new Out(budget);
+            out.force("No text matches for /" + regex + "/ in " + sc + s.scopeNote() + "; " + namedOnly.size() + " file(s) whose path matches:");
+            for (String f : namedOnly) out.tallied("  " + f, f, "file");
+            return out.finish("read one with grep . --path <path>");
+        }
         if (hits.isEmpty()) {
             return "No matches for /" + regex + "/ in " + sc + s.scopeNote() + (filter == null ? "" : " (path contains '" + filter + "')") + "."
                     + (scopes.contains("source") ? "" : " Decompiled code: add scope=source (only classes decompiled before).")
@@ -153,6 +168,10 @@ public final class GrepService {
                 current = h.file();
             }
             out.tallied("  " + h.line() + (h.context() ? "- " : ": ") + h.text(), h.file(), "line");
+        }
+        if (!namedOnly.isEmpty()) {
+            out.force("also " + namedOnly.size() + " file(s) whose path matches but not their text: "
+                    + String.join(", ", namedOnly.subList(0, Math.min(6, namedOnly.size()))) + (namedOnly.size() > 6 ? ", ..." : ""));
         }
         return out.finish("narrow with path=<substring> or scope=config|resources|source|logs");
     }

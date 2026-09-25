@@ -13,7 +13,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
   (`bench/`).
 
-## Status: 1.2.0 (2026-09-25)
+## Status: 1.2.1 (2026-09-25)
 - 0.1–0.2: environment index, eight tools, `mod:` scoping, capped answers that name what they cut, measurement,
   an A/B switch for agents.
 - 0.3: history snapshots, `env import`, `env=<name>@<version>`, use-time auto-sync; empty results point to the past
@@ -35,6 +35,8 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   load no longer count as loaded.
 - 1.2: `refs Class.member` finds a class's own uses and calls made through subclasses, picks the class that has the
   member when several share a name, and marks field uses as reads or writes ("never read" answers need no grep).
+  1.2.1: `grep` names files whose path matches (an advancement's id is its file name), accepts paths as answers
+  show them (`<mod>:<path>`), and a no-match search spends at most 5 s on past versions.
 
 ## After 1.0
 - A baseline and indexing optimization study: compare envx's approach with other environment indexes on the same

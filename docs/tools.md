@@ -35,7 +35,7 @@ Answers show Yarn first and the runtime name in brackets.
 | `refs` | `target`: `Class.member` (call sites and overriders; field uses marked read or write, with a count; calls through subclasses and the class's own uses included, since 1.2.0) or `Class` (who uses it) | `env` |
 | `mixins` | `target`: `Class`, `Class.method`, or `mod:<id>` | `includeAccessors`, `env` |
 | `check_mixins` | `project`: a mod project folder (default: working directory; needs a built jar) | `env` |
-| `grep` | `pattern`: a case-insensitive Java regex (in JSON files a match also shows its whole small object or array, lines marked `N-`; since 0.9.8) | `scope` (`config`, `resources`, `source`, `logs`; comma-separated), `path` (paths containing it), `env` |
+| `grep` | `pattern`: a case-insensitive Java regex (in JSON files a match also shows its whole small object or array, lines marked `N-`; since 0.9.8) | `scope` (`config`, `resources`, `source`, `logs`; comma-separated), `path` (paths containing it; a `<mod>:<path>` copied from an answer works too), `env`. Files whose path matches the pattern are named even when their text does not (since 1.2.1) |
 
 ## Guarantees
 - Read-only toward every environment source. Only `envx env sync`, `env import` and `project index` write the index.
