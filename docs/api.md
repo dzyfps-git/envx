@@ -9,6 +9,8 @@ interface instead, and never read envx's database, whose schema changes through 
 - `envx api` reads requests as JSON lines on stdin and writes one JSON line per request to stdout, in order, then
   exits at end of input. Batch many lookups into one process: each start costs a JVM launch (about 0.5-1 s).
 - `envx api --version` prints `{"api":1,"envx":"1.1.0"}`.
+- Launcher: `<data home>/app/envx` (Linux/macOS) or `envx.cmd` (Windows). Through `cmd.exe` with a quoted path, wrap
+  the whole command in one more pair of quotes: `cmd /d /s /c ""C:\path\envx.cmd" api"`.
 - Read-only: the index is opened read-only, and an api call never starts a sync, even when the environment is due
   for one. Nothing sent to envx is stored.
 
@@ -83,6 +85,8 @@ Who defines these methods?
   `none` (no loaded candidate). envx never answers `exact`: it knows what the jars contain, not which bytes the JVM
   loaded.
 - `member_found`: null when no `method` was given. `yarn` fields are null when unknown.
+- What is indexed: Minecraft and every mod jar (with nested jars). The JDK, Minecraft's bundled libraries (Guava,
+  fastutil, Netty, …) and classes generated at runtime are not: they answer `none` with `class_found: false`.
 - Hidden lambda classes (`…$$Lambda$N/0x…`) resolve as their host class, with `"hidden_lambda":true`. Synthetic
   `lambda$…` methods are members of their class and resolve normally.
 - **Merged mixin methods.** Mixin renames injected handlers into the target class as
