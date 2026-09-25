@@ -216,6 +216,47 @@ public final class SourceService {
     /** Written into a cache folder once every class of its jar is there. */
     static final String COMPLETE = ".complete";
 
+    /**
+     * All of a complete folder's classes in one file, for {@code grep scope=source}: on a spinning disk, reading
+     * 60,000 small files from cold took 21 s or more, most of it seeks; one file per jar is read in one sweep.
+     * Each class starts with a line {@link #PACK_ENTRY}{@code <path>}.
+     */
+    static final String PACK = ".pack";
+    static final char PACK_ENTRY = '\u0001';
+
+    /** Writes {@code dir}'s {@link #PACK} from its .java files (sorted, so it is reproducible). */
+    static void pack(Path dir) throws IOException {
+        List<Path> files;
+        try (var walk = Files.walk(dir)) {
+            files = walk.filter(f -> f.getFileName().toString().endsWith(".java")).sorted().toList();
+        }
+        Path tmp = dir.resolve(PACK + "." + ProcessHandle.current().pid() + ".tmp");
+        try (var out = Files.newBufferedWriter(tmp, java.nio.charset.StandardCharsets.UTF_8)) {
+            for (Path f : files) {
+                out.write(PACK_ENTRY + dir.relativize(f).toString().replace('\\', '/') + "\n");
+                String text = Files.readString(f, java.nio.charset.StandardCharsets.UTF_8);
+                out.write(text);
+                if (!text.endsWith("\n")) out.write("\n");
+            }
+        }
+        Files.move(tmp, dir.resolve(PACK), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /** A {@link #PACK} as {rel path, lines} entries. */
+    static List<Object[]> unpack(Path pack) throws IOException {
+        List<Object[]> out = new ArrayList<>();
+        List<String> lines = null;
+        for (String line : Files.readAllLines(pack, java.nio.charset.StandardCharsets.UTF_8)) {
+            if (!line.isEmpty() && line.charAt(0) == PACK_ENTRY) {
+                lines = new ArrayList<>();
+                out.add(new Object[]{line.substring(1), lines});
+            } else if (lines != null) {
+                lines.add(line);
+            }
+        }
+        return out;
+    }
+
     /** The Yarn-named jar the decompiler reads for an artifact (mods are remapped first, once). */
     static Path decompileInput(Path home, FabricBase base, String kind, String sha) throws IOException {
         return "minecraft".equals(kind) ? base.namedJar() : remapped(home, sha, base);
@@ -243,7 +284,8 @@ public final class SourceService {
 
     /**
      * Decompiles every class of {@code jar} into {@code dir} (the same files {@link #source} caches one at a time;
-     * classes already there are kept), then marks the folder complete. Returns the number of classes written.
+     * classes already there are kept), packs them ({@link #PACK}) and marks the folder complete. Returns the number
+     * of classes written.
      */
     static int decompileAll(Path jar, List<Path> libraries, Path dir, int threads) throws IOException {
         Files.createDirectories(dir);
@@ -288,6 +330,7 @@ public final class SourceService {
             ff.clearContext();
         }
         if (!failed.isEmpty()) throw failed.getFirst();
+        pack(dir);
         Files.writeString(dir.resolve(COMPLETE), written.get() + " classes written " + java.time.Instant.now() + "\n");
         return written.get();
     }

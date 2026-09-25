@@ -79,7 +79,11 @@ public final class GrepService {
             for (Object[] a : q.db().query("SELECT a.id, a.kind, a.sha256 FROM artifact a WHERE a.id IN (" + s.artifactSet() + ")",
                     rs -> new Object[]{rs.getLong(1), rs.getString(2), rs.getString(3)})) {
                 Path r = SourceService.cacheDir(home, base, (String) a[1], (String) a[2]);
-                if (Files.isDirectory(r) && s.includes((long) a[0])) roots.add(new Root(q.label((long) a[0]).split(" ")[0], r, List.of(), null));
+                if (!Files.isDirectory(r) || !s.includes((long) a[0])) continue;
+                String label = q.label((long) a[0]).split(" ")[0];
+                Path pack = r.resolve(SourceService.PACK);
+                roots.add(Files.exists(pack) && Files.exists(r.resolve(SourceService.COMPLETE))
+                        ? new Root(label, null, List.of(), null, pack) : new Root(label, r, List.of(), null, null));
             }
             coverage = FullDecompile.coverage(q, s).note();
         }
@@ -103,7 +107,7 @@ public final class GrepService {
             try (Stream<Object[]> walk = root.files()) {
                 walk.forEach(entry -> {
                     String rel = (String) entry[0];
-                    Path f = (Path) entry[1];
+                    Path f = entry[1] instanceof Path p0 ? p0 : null;
                     if (hits.size() >= MAX_HITS) { // all decompiled code holds millions of lines; a broad pattern stops here
                         capped.set(true);
                         return;
@@ -113,7 +117,9 @@ public final class GrepService {
                     if (filter != null && !lower.contains(filter) && !(root.label.toLowerCase(Locale.ROOT) + ":" + lower).contains(filter)) return;
                     if (!root.pathMustName.isEmpty() && root.pathMustName.stream().noneMatch(lower::contains)) return;
                     try {
-                        List<String> lines = rel.endsWith(".gz") ? LogService.read(f) : Files.readAllLines(f, StandardCharsets.UTF_8);
+                        @SuppressWarnings("unchecked")
+                        List<String> lines = entry[1] instanceof List<?> packed ? (List<String>) packed
+                                : rel.endsWith(".gz") ? LogService.read(f) : Files.readAllLines(f, StandardCharsets.UTF_8);
                         List<Integer> matched = new ArrayList<>();
                         if (names && pattern.matcher(rel).find()) nameHits.add(root.label + ":" + rel);
                         for (int i = 0; i < lines.size(); i++) {
@@ -245,12 +251,18 @@ public final class GrepService {
     }
 
     /**
-     * What to search: a directory, or an explicit list of {rel path, stored file} (a snapshot's text). If
-     * {@code pathMustName} is non-empty, only files whose path contains one of those names count.
+     * What to search: a directory, an explicit list of {rel path, stored file} (a snapshot's text), or a decompiled
+     * jar's pack ({rel path, lines}). If {@code pathMustName} is non-empty, only files whose path contains one of those
+     * names count.
      */
-    private record Root(String label, Path dir, List<String> pathMustName, List<Object[]> list) {
+    private record Root(String label, Path dir, List<String> pathMustName, List<Object[]> list, Path pack) {
+        Root(String label, Path dir, List<String> pathMustName, List<Object[]> list) {
+            this(label, dir, pathMustName, list, null);
+        }
+
         Stream<Object[]> files() throws IOException {
             if (list != null) return list.stream();
+            if (pack != null) return SourceService.unpack(pack).stream();
             return Files.walk(dir).filter(Files::isRegularFile)
                     .filter(f -> !f.getFileName().toString().startsWith(".") && !f.getFileName().toString().endsWith(".tmp")) // markers, writes in progress
                     .map(f -> new Object[]{dir.relativize(f).toString().replace('\\', '/'), f});

@@ -21,6 +21,12 @@ public final class Main {
     private static final String USAGE = """
             envx: Minecraft/Fabric environment index for AI agents
 
+            Everyday
+              envx status                       agents on/off, how fresh each environment is, background work
+              envx on | off                     = envx agents on|off
+              envx sync [<name>]                = envx env sync (default environment)
+              envx stop                         = envx decompile --stop
+
             Setup
               envx init [<minecraft> <yarn>]    Minecraft + Yarn base (from the Loom cache, else downloaded and hash-checked)
 
@@ -50,9 +56,11 @@ public final class Main {
             Agents
               envx mcp                          run the MCP server on stdio
               envx setup [--claude] [--codex] [--project <dir>]...   install this version; register / write agent instructions
+              envx setup --path                 put `envx` on your PATH (Windows: user PATH; elsewhere: prints the line to add)
               envx agents on|off|status         switch envx on/off in Codex + Claude Code + AGENTS.md/CLAUDE.md (A/B tests)
               envx agents bench-config [<dir>]  the MCP command and instructions a headless ON run uses (changes nothing)
               envx stats                        index size and counts
+              envx traces [--days 30]           what agents rediscovered by hand: mined from Codex/Claude Code sessions in place
 
             Programs
               envx api                          versioned JSON-lines interface on stdin/stdout (docs/api.md); read-only
@@ -61,7 +69,8 @@ public final class Main {
 
     public static void main(String[] args) throws Exception {
         System.setOut(new PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.out), true, StandardCharsets.UTF_8));
-        if (args.length == 0 || args[0].equals("help") || args[0].equals("--help")) {
+        if (args.length == 0) args = new String[]{"status"}; // the everyday screen; `envx help` lists every command
+        if (args[0].equals("help") || args[0].equals("--help")) {
             System.out.print(USAGE);
             return;
         }
@@ -90,6 +99,26 @@ public final class Main {
         String cmd = args[0];
         List<String> rest = new ArrayList<>(Arrays.asList(args).subList(1, args.length));
         switch (cmd) {
+            case "status" -> {
+                return Status.print(config);
+            }
+            case "on", "off" -> {
+                return AgentSetup.agents(config, List.of(cmd));
+            }
+            case "sync" -> {
+                String env = rest.isEmpty() ? config.envFor(Path.of("").toAbsolutePath()) : rest.getFirst();
+                if (env == null) throw new IllegalArgumentException("usage: envx sync <name> (no default environment; envx default <name> sets one)");
+                return sync(config, env, false);
+            }
+            case "traces" -> {
+                int days = rest.contains("--days") ? Integer.parseInt(rest.get(rest.indexOf("--days") + 1)) : 30;
+                System.out.print(dev.envx.traces.TraceReport.run(config, days));
+                return 0;
+            }
+            case "stop" -> {
+                System.out.println(dev.envx.query.FullDecompile.stop(config));
+                return 0;
+            }
             case "env" -> {
                 return env(config, rest);
             }

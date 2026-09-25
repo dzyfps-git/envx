@@ -36,9 +36,11 @@ experiment; the machine interface (`envx api` v1) hides the internals, so none o
    Yarn names; line ranges from parsed source would duplicate it.
 
 ## Consequences
-- A large server pack (about 600 jars with code) costs roughly 20–30 minutes of idle-priority CPU once and a few
+- A large server pack (about 600 jars with code) took 9 minutes of idle-priority work once (about 1.6 cores) and a few
   hundred MB under `decomp/`; later syncs add minutes at most.
 - `decomp/` keeps folders of jars no longer loaded (past versions). They are a cache and can be deleted; no pruning
   is automatic yet.
-- If searching all decompiled code becomes slow, a trigram or symbol index over `decomp/` is the next step; not
-  needed at the measured sizes.
+- Cold searches (1.4.0): on a spinning disk, the first search after the file cache was dropped took 21 s, nearly all
+  of it opening 60,000 small files. Each complete folder now also holds one packed file of all its classes
+  (`.pack`, about 220 MB for the whole pack), which `grep scope=source` reads instead: 4 s cold, under 1 s warm. A
+  search index is not needed at these sizes; revisit if the call log shows slow source searches.

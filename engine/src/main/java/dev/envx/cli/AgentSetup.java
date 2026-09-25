@@ -60,6 +60,10 @@ final class AgentSetup {
     static int setup(Config config, List<String> args) throws IOException, InterruptedException {
         boolean claude = args.contains("--claude");
         boolean codex = args.contains("--codex");
+        if (args.contains("--path")) {
+            addToPath(config);
+            if (!claude && !codex && !args.contains("--project")) return 0;
+        }
         List<Path> projects = new ArrayList<>();
         for (int i = 0; i < args.size(); i++) if (args.get(i).equals("--project") && i + 1 < args.size()) projects.add(Path.of(args.get(++i)));
         if (!claude && !codex && projects.isEmpty()) {
@@ -147,6 +151,41 @@ final class AgentSetup {
         }
         System.out.println("(start new agent sessions for this to take effect)");
         return status(config, state);
+    }
+
+    /**
+     * Puts the launcher folder ({@code <data home>/app}, which always holds the current version's launcher) on the
+     * user's PATH, so `envx` works in any new terminal. Windows: the user PATH (no admin rights, no system PATH).
+     * Elsewhere shell profiles differ, so the line to add is printed instead of editing one.
+     */
+    static void addToPath(Config config) throws IOException, InterruptedException {
+        Path app = config.home().resolve("app").toAbsolutePath();
+        if (!WINDOWS) {
+            System.out.println("add this line to your shell profile (~/.bashrc, ~/.zshrc):\n  export PATH=\"" + app + ":$PATH\"");
+            return;
+        }
+        // The raw value keeps %VARIABLES% unexpanded (reading it through [Environment] would expand them for good);
+        // setting and clearing a user variable afterwards tells Windows to hand new terminals the new PATH.
+        String script = "$d = '" + app.toString().replace("'", "''") + "'; "
+                + "$k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true); "
+                + "$p = [string]$k.GetValue('Path', '', 'DoNotExpandEnvironmentNames'); "
+                + "if (($p -split ';') -contains $d) { 'already on PATH' } else { "
+                + "$k.SetValue('Path', $(if ($p) { $p.TrimEnd(';') + ';' + $d } else { $d }), 'ExpandString'); "
+                + "[Environment]::SetEnvironmentVariable('ENVX_PATH_REFRESH', '1', 'User'); "
+                + "[Environment]::SetEnvironmentVariable('ENVX_PATH_REFRESH', $null, 'User'); 'added' }";
+        String out = exec(List.of("powershell", "-NoProfile", "-NonInteractive", "-Command", script), false).trim();
+        System.out.println(app + ": " + out + (out.equals("added") ? " to your user PATH; open a new terminal and type: envx" : ""));
+    }
+
+    /** One line for `envx status`: ON, OFF, or which parts are on. */
+    static String summary(Config config) throws IOException {
+        Boolean codexOn = codexEnabled();
+        boolean claudeOn = claudeRegistered();
+        boolean blocks = !blockFiles(config, loadState(config)).isEmpty();
+        if (Boolean.TRUE.equals(codexOn) && claudeOn && blocks) return "ON for Codex and Claude Code";
+        if (!Boolean.TRUE.equals(codexOn) && !claudeOn && !blocks) return "OFF (clean baseline)";
+        return "MIXED: Codex " + (Boolean.TRUE.equals(codexOn) ? "on" : "off") + ", Claude Code " + (claudeOn ? "on" : "off")
+                + ", instruction blocks " + (blocks ? "present" : "none") + " (envx on | envx off fixes it)";
     }
 
     private static int status(Config config, State state) throws IOException {
@@ -496,17 +535,19 @@ final class AgentSetup {
         Files.writeString(config.home().resolve("agents.json"), GSON.toJson(state));
     }
 
-    private static void exec(List<String> cmd, boolean ignoreFailure) throws IOException, InterruptedException {
+    /** Runs {@code cmd} and returns its output. */
+    private static String exec(List<String> cmd, boolean ignoreFailure) throws IOException, InterruptedException {
         Process p;
         try {
             p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
         } catch (IOException e) {
-            if (ignoreFailure) return;
+            if (ignoreFailure) return "";
             throw e;
         }
         p.getOutputStream().close();
         String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         if (!p.waitFor(60, TimeUnit.SECONDS)) p.destroyForcibly();
         if (p.exitValue() != 0 && !ignoreFailure) throw new IOException(String.join(" ", cmd.subList(0, 3)) + " failed: " + out.trim());
+        return out;
     }
 }

@@ -71,6 +71,15 @@ public final class AutoSync {
         return home.resolve("envs").resolve(env).resolve("sync.lock");
     }
 
+    /** True while a sync of {@code env} holds its lock. */
+    public static boolean running(Path home, String env) {
+        try {
+            return lockHeld(home, env);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     static boolean lockHeld(Path home, String env) throws IOException {
         Path lock = lockFile(home, env);
         return Files.exists(lock) && Files.getLastModifiedTime(lock).toInstant().plus(STALE_LOCK).isAfter(Instant.now());

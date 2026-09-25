@@ -36,8 +36,19 @@ envx env add myserver /path/to/server                # or \\host\share, or ssh:/
 envx env sync myserver                               # index its mods, configs and logs
 envx link /path/to/my-mod myserver                   # queries from that project use this environment
 envx setup --claude --codex                          # install; register the MCP server with Claude Code and Codex
+envx setup --path                                    # optional: put `envx` on your PATH (Windows: user PATH)
 ```
 Data lives in `~/.envx`. To keep it elsewhere, set `ENVX_HOME` or put the path on one line in `~/.envx/location`.
+
+## Everyday
+```
+envx                                      # status: agents on/off, how fresh each environment is, background work
+envx on | off                             # switch envx on/off for Codex and Claude Code (new sessions)
+envx sync                                 # pull the default environment's mods and configs now
+envx stop                                 # stop the background decompile (the next sync continues it)
+envx traces                               # what agents still rediscovered by hand, from their session files (ADR 0012)
+envx help                                 # every command
+```
 
 ## Use
 ```

@@ -49,14 +49,15 @@ public final class FullDecompile {
         }
     }
 
-    /** Loaded jars with classes whose cache folder is not complete yet: Minecraft first, then small jars first. */
+    /** Loaded jars with classes whose cache folder is not complete and packed yet: Minecraft first, then small jars first. */
     static List<Job> pending(QueryService q, Scope s, FabricBase base) throws SQLException {
         List<Job> out = new ArrayList<>();
         for (Job j : q.db().query("""
                 SELECT a.id, a.kind, a.sha256, (SELECT count(*) FROM class c WHERE c.artifact_id=a.id) n FROM artifact a
                 WHERE a.id IN (""" + s.artifactSet() + ") AND n > 0 ORDER BY a.kind<>'minecraft', n, a.id",
                 rs -> new Job(rs.getLong(1), null, rs.getString(2), rs.getString(3), rs.getInt(4)))) {
-            if (Files.exists(SourceService.cacheDir(q.config().home(), base, j.kind(), j.sha()).resolve(SourceService.COMPLETE))) continue;
+            Path dir = SourceService.cacheDir(q.config().home(), base, j.kind(), j.sha());
+            if (Files.exists(dir.resolve(SourceService.COMPLETE)) && Files.exists(dir.resolve(SourceService.PACK))) continue;
             out.add(new Job(j.artifactId(), q.label(j.artifactId()), j.kind(), j.sha(), j.classes()));
         }
         return out;
@@ -126,6 +127,11 @@ public final class FullDecompile {
                 long t = System.nanoTime();
                 try {
                     Path dir = SourceService.cacheDir(home, base, j.kind(), j.sha());
+                    if (Files.exists(dir.resolve(SourceService.COMPLETE))) { // decompiled by 1.3.0/1.3.1, before packs
+                        SourceService.pack(dir);
+                        done++;
+                        continue;
+                    }
                     int n = SourceService.decompileAll(SourceService.decompileInput(home, base, j.kind(), j.sha()),
                             SourceService.libraries(base, j.kind()), dir, Math.max(1, config.decompileThreads));
                     done++;

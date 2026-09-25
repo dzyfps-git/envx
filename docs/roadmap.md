@@ -14,7 +14,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
   (`bench/`).
 
-## Status: 1.3.1 (2026-09-25)
+## Status: 1.4.0 (2026-09-25)
 - 0.1–0.2: environment index, eight tools, `mod:` scoping, capped answers that name what they cut, measurement,
   an A/B switch for agents.
 - 0.3: history snapshots, `env import`, `env=<name>@<version>`, use-time auto-sync; empty results point to the past
@@ -42,6 +42,10 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   idle priority, so `grep scope=source` searches all code instead of classes read before (it found more in 18 of 24
   logged searches); `envx decompile --status|--stop`. 1.3.1: mods with a method whose Yarn name collides with an
   inherited Minecraft one (1 in 85 jars) are remapped with that member left under its runtime name instead of failing.
+- 1.4: trace mining (ADR 0012): `envx traces` reads Codex and Claude Code session files in place and reports the
+  shell work envx could have answered, what agents did right after an envx answer, answers that cost a follow-up and
+  slow calls. Everyday commands: `envx` (status), `envx on|off`, `envx sync`, `envx stop`, `envx setup --path`.
+  Code search reads one packed file per decompiled jar: a cold search on a spinning disk went from 21 s to 4 s.
 
 ## After 1.0
 - Adaptive, reusable knowledge: notes anchored to what they describe (a jar hash, an environment, a project) and

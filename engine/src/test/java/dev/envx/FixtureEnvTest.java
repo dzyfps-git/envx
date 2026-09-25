@@ -283,6 +283,18 @@ class FixtureEnvTest {
         log.reset();
         dev.envx.query.FullDecompile.decompilePending(config, "fx", new java.io.PrintStream(log, true));
         assertTrue(log.toString().contains("0 jar(s) to decompile"), log.toString()); // each jar once
+
+        // folders decompiled before packs existed (1.3.0/1.3.1) are packed, not decompiled again
+        Path pack;
+        try (var dirs = Files.list(config.home().resolve("decomp"))) {
+            pack = dirs.filter(d -> d.getFileName().toString().startsWith("fabric-")).findFirst().orElseThrow().resolve(".pack");
+        }
+        Files.delete(pack);
+        assertTrue(Tools.call(ctx, "grep", a, tmp).text().contains("== minecraft:net/minecraft/entity/LivingEntity.java")); // folder walk
+        log.reset();
+        dev.envx.query.FullDecompile.decompilePending(config, "fx", new java.io.PrintStream(log, true));
+        assertTrue(log.toString().contains("1 jar(s) to decompile") && Files.exists(pack), log.toString());
+        assertTrue(Files.readString(pack).contains("\u0001net/minecraft/entity/LivingEntity.java\n"));
     }
 
     @Test
