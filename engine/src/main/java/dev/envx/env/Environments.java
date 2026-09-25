@@ -214,8 +214,9 @@ public final class Environments {
                 db.update("INSERT OR IGNORE INTO snapshot_loaded(snapshot_id, mod_id, version, nested) VALUES(?,?,?,?)",
                         snap[0], m.id(), m.version(), m.nested() ? 1 : 0);
             }
+            Config.EnvDef def = config.environments.get(env);
             stale.addAll(writeArtifactClosure(snap[0], mcId, results.values().stream().map(Indexer.Result::artifactId).toList(),
-                    loaded, jarMtime, logMtime));
+                    loaded, jarMtime, logMtime, def == null || !"client".equals(def.side)));
         });
 
         String diff = "";
@@ -294,7 +295,8 @@ public final class Environments {
      * newer; the latter are returned so the summary can say the log is stale for them.
      */
     private List<String> writeArtifactClosure(long snapshot, long mcId, List<Long> topLevel, List<LoaderLog.LoadedMod> loaded,
-                                              Map<Long, Long> jarMtime, long logMtime) throws SQLException {
+                                              Map<Long, Long> jarMtime, long logMtime, boolean server) throws SQLException {
+        this.server = server;
         Set<String> loadedKeys = new HashSet<>();
         for (LoaderLog.LoadedMod m : loaded) loadedKeys.add(m.id() + " " + LoaderLog.normalizeVersion(m.version()));
         List<String> stale = new ArrayList<>();
@@ -320,7 +322,12 @@ public final class Environments {
         }
     }
 
+    /** Set per snapshot: on a server, mods declaring {@code "environment": "client"} are never loaded (weak spot 13). */
+    private boolean server = true;
+
     private boolean isLoaded(long artifactId, Set<String> keys) throws SQLException {
+        if (server && db.queryInt("SELECT count(*) FROM artifact WHERE id=? AND "
+                + dev.envx.query.Scope.CLIENT_ONLY_SQL.replace("{a}", "artifact"), artifactId) > 0) return false;
         if (keys.isEmpty()) return true;
         String modId = db.queryString("SELECT mod_id FROM artifact WHERE id=?", artifactId);
         if (modId == null) return true; // plain library: follows its parent

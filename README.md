@@ -4,7 +4,8 @@ The long-term goal is one workspace for modding projects, with Claude Code and C
 This repo currently contains **Phase 1: `envx`**, a local index of a Minecraft/Fabric environment that agents
 query instead of unzipping jars, running `javap`, or decompiling things by hand.
 
-Status and roadmap: `docs/roadmap.md`. Design decisions: `docs/adr/`. Query reference: `docs/tools.md`.
+Status and roadmap: `docs/roadmap.md`. Design decisions: `docs/adr/`. Query reference: `docs/tools.md`. Programs
+(not agents) use the versioned JSON interface `envx api` (`docs/api.md`).
 
 **Does it help?** In the 1.0 benchmark (18 real questions about a 446-mod Fabric server, GPT-6 Sol at High, the same
 question with and without envx), agents used a median of 88% fewer tokens at equal or better correctness. The

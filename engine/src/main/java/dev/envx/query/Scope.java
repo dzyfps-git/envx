@@ -47,9 +47,19 @@ public record Scope(String env, long snapshotId, String takenAt, String source, 
         return alias + ".artifact_id IN (" + artifactSet() + ")";
     }
 
-    /** SQL subquery of the artifact ids this scope sees. */
+    /**
+     * SQL condition on artifact alias {@code {a}}: its {@code fabric.mod.json} says {@code "environment": "client"}.
+     * A dedicated server does not load such mods, although its loader log prints nested copies of them in the mod tree.
+     */
+    public static final String CLIENT_ONLY_SQL =
+            "(CASE WHEN json_valid({a}.meta_json) THEN json_extract({a}.meta_json, '$.environment') END) = 'client'";
+
+    /** SQL subquery of the artifact ids this scope sees (on a server, never client-only mods; weak spot 13). */
     public String artifactSet() {
         String loaded = "SELECT artifact_id FROM snapshot_artifact WHERE snapshot_id=" + snapshotId + " AND loaded=1";
+        if (def == null || !"client".equals(def.side)) {
+            loaded += " AND artifact_id NOT IN (SELECT id FROM artifact WHERE " + CLIENT_ONLY_SQL.replace("{a}", "artifact") + ")";
+        }
         if (overlay == null) return loaded;
         return loaded + (overlay.replaced().isEmpty() ? "" : " AND artifact_id NOT IN (" + ids(overlay.replaced()) + ")")
                 + " UNION SELECT id FROM artifact WHERE id IN (" + ids(overlay.added()) + ")";

@@ -13,7 +13,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
   (`bench/`).
 
-## Status: 1.0.0 (2026-09-25)
+## Status: 1.1.0 (2026-09-25)
 - 0.1–0.2: environment index, eight tools, `mod:` scoping, capped answers that name what they cut, measurement,
   an A/B switch for agents.
 - 0.3: history snapshots, `env import`, `env=<name>@<version>`, use-time auto-sync; empty results point to the past
@@ -30,10 +30,11 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - 0.9: weak spots found by agent runs, each fixed with a check that fails on the version before.
 - 1.0: final validation. With envx, agents used a median of 88% fewer tokens at equal or better correctness on
   like-for-like pairs; CI green on Linux, Windows and macOS (`bench/README.md`).
+- 1.1: a stable machine interface for other tools: `envx api`, JSON lines, versioned, read-only, batch lookups with
+  portable identifiers (`docs/api.md`). On a server, nested client-only jars that the loader prints but does not
+  load no longer count as loaded.
 
 ## After 1.0
-- **Next (1.1):** a stable machine interface for other tools: `envx api`, JSON lines, versioned, read-only, batch
-  lookups with portable identifiers. Draft contract: `docs/api.md`.
 - A baseline and indexing optimization study: compare envx's approach with other environment indexes on the same
   questions (agent efficiency, context use, query speed, index size, decompilation strategy) and adopt what wins.
 - Adaptive, reusable knowledge: notes anchored to what they describe (a jar hash, an environment, a project) and

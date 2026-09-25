@@ -631,7 +631,7 @@ public final class QueryService {
         }
         if (!v.isEmpty()) out.line("runtime (from server log): " + v);
         int jars = db.queryInt("SELECT count(*) FROM snapshot_file WHERE snapshot_id=?", s.snapshotId());
-        int loaded = db.queryInt("SELECT count(*) FROM snapshot_artifact sa JOIN artifact a ON a.id=sa.artifact_id WHERE sa.snapshot_id=? AND sa.loaded=1 AND a.mod_id IS NOT NULL", s.snapshotId());
+        int loaded = db.queryInt("SELECT count(*) FROM artifact a WHERE a.id IN (" + s.artifactSet() + ") AND a.mod_id IS NOT NULL");
         String checked = db.queryString("SELECT checked_at FROM snapshot WHERE id=?", s.snapshotId());
         out.line("snapshot " + s.snapshotId() + " taken " + s.takenAt() + " (" + age(s.takenAt()) + ")"
                 + (checked != null && !checked.equals(s.takenAt()) ? ", last checked " + age(checked) : "") + " from " + s.source());

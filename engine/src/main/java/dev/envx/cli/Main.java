@@ -51,6 +51,10 @@ public final class Main {
               envx agents on|off|status         switch envx on/off in Codex + Claude Code + AGENTS.md/CLAUDE.md (A/B tests)
               envx agents bench-config [<dir>]  the MCP command and instructions a headless ON run uses (changes nothing)
               envx stats                        index size and counts
+
+            Programs
+              envx api                          versioned JSON-lines interface on stdin/stdout (docs/api.md); read-only
+              envx api --version
             """;
 
     public static void main(String[] args) throws Exception {
@@ -62,6 +66,13 @@ public final class Main {
         if (args[0].equals("mcp")) {
             McpServer.run();
             return;
+        }
+        if (args[0].equals("api")) { // no auto-sync, no call-log text: a program's interface (docs/api.md)
+            if (args.length > 1 && args[1].equals("--version")) {
+                System.out.println(dev.envx.api.Api.versionLine());
+                return;
+            }
+            System.exit(dev.envx.api.Api.run(Config.load(), System.in, System.out));
         }
         Config config = Config.load();
         try {
