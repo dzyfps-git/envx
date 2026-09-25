@@ -133,7 +133,7 @@ class TraceReportTest {
 
     @Test
     void serverLogsAreAServersOwnLogsNotAProjectsTestRun() {
-        for (String s : List.of("rg x V:\\logs\\latest.log", "Get-Content 'C:\\MyServer\\logs\\latest.log'", "ls \\\\host\\share\\crash-reports")) {
+        for (String s : List.of("rg x S:\\logs\\latest.log", "Get-Content 'C:\\MyServer\\logs\\latest.log'", "ls \\\\host\\share\\crash-reports")) {
             assertEquals("server logs", TraceReport.classify(s).name(), s);
         }
         for (String s : List.of(".\\integration\\candidate\\logs\\latest.log", "D:\\Projects\\my-mod\\1.5\\run\\logs\\latest.log", "tail run/logs/latest.log")) {

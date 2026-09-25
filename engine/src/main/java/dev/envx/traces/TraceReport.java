@@ -46,7 +46,7 @@ public final class TraceReport {
             new Category("mixin configs", Pattern.compile("(?i)mixins?\\.json|refmap"), "mixins / check_mixins"),
             new Category("mod metadata", Pattern.compile("(?i)fabric\\.mod\\.json"), "find mod:<id> / env"),
             new Category("Gradle caches", Pattern.compile("(?i)\\.gradle[\\\\/]caches|loom-cache|fabric-loom"), "find / source"),
-            // a server's own logs: a drive or share root, at most one folder deep (V:\logs, C:\MyServer\logs, \\host\share\logs);
+            // a server's own logs: a drive or share root, at most one folder deep (S:\logs, C:\MyServer\logs, \\host\share\logs);
             // a project's test run (.\run\logs, ...\integration\x\logs) is the agent checking its own work, which envx does not index
             new Category("server logs", Pattern.compile("(?i)(?<![\\w.])(?:[A-Z]:|\\\\\\\\[\\w.-]+\\\\[\\w.$ -]+)[\\\\/]+(?:[^\\\\/'\"\\s]+[\\\\/]+)?"
                     + "(?:logs[\\\\/]+(?:latest|debug)\\.log|crash-reports)"), "env filter=errors / grep scope=logs"),
