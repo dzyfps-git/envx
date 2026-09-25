@@ -64,6 +64,7 @@ class AutoSyncEndToEndTest {
         config.environments.put("fx", def);
         config.defaultEnv = "fx";
         config.autoSyncHours = 0.001; // due on every use: the test does not wait hours
+        config.decompileAll = false; // no background decompile left running after the test
         config.save();
         try (Db db = Db.open(home, false)) {
             new Environments(config, db).sync("fx", m -> {});

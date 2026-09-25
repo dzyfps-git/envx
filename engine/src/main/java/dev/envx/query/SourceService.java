@@ -15,16 +15,19 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.jar.Manifest;
 import java.util.regex.Pattern;
 
 /**
- * Readable source on demand. Nothing is decompiled up front: the first request for a class
- * decompiles that one class (with its inner classes) and caches the result on disk forever, keyed
- * by jar hash + mappings + decompiler version.
+ * Readable source on demand. The first request for a class decompiles that one class (with its inner
+ * classes) and caches the result on disk forever, keyed by jar hash + mappings + decompiler version.
+ * {@link FullDecompile} fills the same cache for whole jars in the background after a sync, so most
+ * requests find their class already there and {@code grep scope=source} covers every loaded jar.
  *
  * <p>Minecraft classes come from Loom's Yarn-named jar. Mod jars are intermediary at runtime, so
  * they are first remapped to Yarn once per jar (cached), then decompiled class by class.
@@ -52,20 +55,9 @@ public final class SourceService {
         String namedOuter = outer(c.named());
         String kind = q.db().queryString("SELECT kind FROM artifact WHERE id=?", c.artifactId());
         String sha = q.db().queryString("SELECT sha256 FROM artifact WHERE id=?", c.artifactId());
-        Path sourceJar;
-        String className;
-        String cacheKey;
-        if ("minecraft".equals(kind)) {
-            sourceJar = base.namedJar();
-            className = namedOuter;
-            cacheKey = base.id() + "-" + DECOMPILER;
-        } else {
-            sourceJar = remapped(sha, base);
-            className = runtimeOuter; // mod classes keep their own names
-            cacheKey = sha.substring(0, 16) + "-" + base.id() + "-" + DECOMPILER;
-        }
-        Path cached = home.resolve("decomp").resolve(cacheKey).resolve(className + ".java");
-        if (!Files.exists(cached)) decompile(sourceJar, className, "minecraft".equals(kind) ? List.of() : List.of(base.namedJar()), cached);
+        String className = "minecraft".equals(kind) ? namedOuter : runtimeOuter; // mod classes keep their own names
+        Path cached = cacheDir(home, base, kind, sha).resolve(className + ".java");
+        if (!Files.exists(cached)) decompile(decompileInput(home, base, kind, sha), className, libraries(base, kind), cached);
         List<String> text = Files.readAllLines(cached);
 
         String header = "// " + Sig.dotted(namedOuter) + " | " + q.label(c.artifactId()) + " | " + s.def().mappings
@@ -214,6 +206,91 @@ public final class SourceService {
 
     // ---------------------------------------------------------------- decompile / remap
 
+    /** Where an artifact's decompiled classes are cached: {@code decomp/<jar sha prefix>-<mappings>-<decompiler>/<class>.java}. */
+    static Path cacheDir(Path home, FabricBase base, String kind, String sha) {
+        String key = "minecraft".equals(kind) ? base.id() + "-" + DECOMPILER : sha.substring(0, 16) + "-" + base.id() + "-" + DECOMPILER;
+        return home.resolve("decomp").resolve(key);
+    }
+
+    /** Written into a cache folder once every class of its jar is there. */
+    static final String COMPLETE = ".complete";
+
+    /** The Yarn-named jar the decompiler reads for an artifact (mods are remapped first, once). */
+    static Path decompileInput(Path home, FabricBase base, String kind, String sha) throws IOException {
+        return "minecraft".equals(kind) ? base.namedJar() : remapped(home, sha, base);
+    }
+
+    static List<Path> libraries(FabricBase base, String kind) {
+        return "minecraft".equals(kind) ? List.of() : List.of(base.namedJar());
+    }
+
+    private static Map<String, Object> options(int threads) {
+        Map<String, Object> options = new HashMap<>();
+        options.put("dgs", "1");   // generic signatures
+        options.put("rsy", "1");   // hide synthetic members
+        options.put("rbr", "1");   // hide bridge methods
+        options.put("ind", "    ");
+        options.put("log", "ERROR");
+        options.put("thr", String.valueOf(threads));
+        return options;
+    }
+
+    private static final IFernflowerLogger QUIET = new IFernflowerLogger() {
+        @Override public void writeMessage(String message, Severity severity) {}
+        @Override public void writeMessage(String message, Severity severity, Throwable t) {}
+    };
+
+    /**
+     * Decompiles every class of {@code jar} into {@code dir} (the same files {@link #source} caches one at a time;
+     * classes already there are kept), then marks the folder complete. Returns the number of classes written.
+     */
+    static int decompileAll(Path jar, List<Path> libraries, Path dir, int threads) throws IOException {
+        Files.createDirectories(dir);
+        AtomicInteger written = new AtomicInteger();
+        List<IOException> failed = Collections.synchronizedList(new ArrayList<>());
+        String tmpSuffix = "." + ProcessHandle.current().pid() + ".tmp"; // never collides with an on-demand decompile
+        IResultSaver saver = new IResultSaver() {
+            @Override public void saveFolder(String path) {}
+            @Override public void copyFile(String source, String path, String entryName) {}
+            @Override public void saveClassFile(String path, String qualifiedName, String entryName, String content, int[] mapping) {
+                save(qualifiedName, content);
+            }
+            @Override public void createArchive(String path, String archiveName, Manifest manifest) {}
+            @Override public void saveDirEntry(String path, String archiveName, String entryName) {}
+            @Override public void copyEntry(String source, String path, String archiveName, String entry) {}
+            @Override public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content) {
+                save(qualifiedName, content);
+            }
+            @Override public void closeArchive(String path, String archiveName) {}
+
+            private void save(String qualifiedName, String content) {
+                if (content == null) return;
+                Path target = dir.resolve(qualifiedName + ".java");
+                try {
+                    if (Files.exists(target)) return;
+                    Files.createDirectories(target.getParent());
+                    Path tmp = target.resolveSibling(target.getFileName() + tmpSuffix);
+                    Files.writeString(tmp, content);
+                    Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    written.incrementAndGet();
+                } catch (IOException e) {
+                    failed.add(e);
+                }
+            }
+        };
+        Fernflower ff = new Fernflower(saver, options(threads), QUIET);
+        try {
+            ff.addSource(jar.toFile());
+            for (Path lib : libraries) ff.addLibrary(lib.toFile());
+            ff.decompileContext();
+        } finally {
+            ff.clearContext();
+        }
+        if (!failed.isEmpty()) throw failed.getFirst();
+        Files.writeString(dir.resolve(COMPLETE), written.get() + " classes written " + java.time.Instant.now() + "\n");
+        return written.get();
+    }
+
     private static synchronized void decompile(Path jar, String className, List<Path> libraries, Path target) throws IOException {
         Map<String, String> results = new HashMap<>();
         IResultSaver saver = new IResultSaver() {
@@ -230,18 +307,7 @@ public final class SourceService {
             }
             @Override public void closeArchive(String path, String archiveName) {}
         };
-        Map<String, Object> options = new HashMap<>();
-        options.put("dgs", "1");   // generic signatures
-        options.put("rsy", "1");   // hide synthetic members
-        options.put("rbr", "1");   // hide bridge methods
-        options.put("ind", "    ");
-        options.put("log", "ERROR");
-        options.put("thr", "1");
-        IFernflowerLogger quiet = new IFernflowerLogger() {
-            @Override public void writeMessage(String message, Severity severity) {}
-            @Override public void writeMessage(String message, Severity severity, Throwable t) {}
-        };
-        Fernflower ff = new Fernflower(saver, options, quiet);
+        Fernflower ff = new Fernflower(saver, options(1), QUIET);
         try {
             ff.addSource(jar.toFile());
             for (Path lib : libraries) ff.addLibrary(lib.toFile());
@@ -259,12 +325,12 @@ public final class SourceService {
     }
 
     /** Remaps a mod jar from intermediary to Yarn once, with Minecraft on the classpath so overrides get renamed too. */
-    private synchronized Path remapped(String sha, FabricBase base) throws IOException {
+    static synchronized Path remapped(Path home, String sha, FabricBase base) throws IOException {
         Path out = home.resolve("remapped").resolve(sha.substring(0, 16) + "-" + base.id() + ".jar");
         if (Files.exists(out)) return out;
         Path in = home.resolve("artifacts").resolve(sha.substring(0, 2)).resolve(sha + ".jar");
         Files.createDirectories(out.getParent());
-        Path tmp = out.resolveSibling(out.getFileName() + ".tmp");
+        Path tmp = out.resolveSibling(out.getFileName() + "." + ProcessHandle.current().pid() + ".tmp"); // another process may remap the same jar
         Files.deleteIfExists(tmp);
         TinyRemapper remapper = TinyRemapper.newRemapper()
                 .withMappings(TinyUtils.createTinyMappingProvider(base.mappingsFile(), "intermediary", "named"))

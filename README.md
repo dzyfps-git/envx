@@ -18,7 +18,8 @@ questions describe a private server and are not published; the harness is in `be
   Only mods that the server's `latest.log` shows as loaded count as active.
 - Classes, members, inheritance, class-level references, `fabric.mod.json`, and mixins (configs + refmaps).
 - Mod data files (recipes, tags, functions, ...) and the server's config/datapack text, with secrets redacted.
-- Sources are decompiled **on demand**, one class at a time, with Vineflower, and cached.
+- Sources are decompiled with Vineflower and cached: on demand for a class, and every loaded jar in a background
+  process after a sync (idle priority, 2 threads; `decompileAll` in `config.json`), so code search covers all of it.
 - The server's recent logs and crash reports, copied read-only and summarized on demand (not part of snapshots).
 
 ## Build

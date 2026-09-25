@@ -264,6 +264,28 @@ class FixtureEnvTest {
     }
 
     @Test
+    @Order(Integer.MAX_VALUE - 1)
+    void everyLoadedJarIsDecompiledIntoTheSourceSearch() throws Exception { // study: grep scope=source found more with all code
+        JsonObject a = new JsonObject();
+        a.addProperty("pattern", "onTick|tick");
+        a.addProperty("scope", "source");
+        a.addProperty("env", "fx");
+        assertTrue(Tools.call(ctx, "grep", a, tmp).text().contains("jars fully decompiled, the rest only where read before"));
+
+        java.io.ByteArrayOutputStream log = new java.io.ByteArrayOutputStream();
+        dev.envx.query.FullDecompile.decompilePending(config, "fx", new java.io.PrintStream(log, true));
+        assertTrue(log.toString().contains("done: 3 of 3 jar(s)"), log.toString());
+        String out = Tools.call(ctx, "grep", a, tmp).text();
+        assertTrue(out.contains("== minecraft:net/minecraft/entity/LivingEntity.java"), out);
+        assertTrue(out.contains("== demo:dev/demo/mixin/LivingMixin.java"), out); // labeled by mod, and only the loaded version
+        assertFalse(out.contains("fully decompiled"), out);
+        assertTrue(dev.envx.query.FullDecompile.status(config, "fx").contains("3 of 3 jars fully decompiled"));
+        log.reset();
+        dev.envx.query.FullDecompile.decompilePending(config, "fx", new java.io.PrintStream(log, true));
+        assertTrue(log.toString().contains("0 jar(s) to decompile"), log.toString()); // each jar once
+    }
+
+    @Test
     void configsAreSearchable() {
         JsonObject a = new JsonObject();
         a.addProperty("pattern", "radius");

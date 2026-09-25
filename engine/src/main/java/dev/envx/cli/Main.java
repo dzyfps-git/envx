@@ -32,6 +32,8 @@ public final class Main {
               envx env import <name> <server folder> [--label <version>]   add a past version (e.g. a backup) as history
               envx env history <name>           snapshots, labels, which one is current
               envx env diff <name> [<from> [<to>]]   mod changes between versions (labels or snapshot ids)
+              envx decompile [<name>] [--status|--stop]   decompile every loaded jar into the source cache
+                                                (starts by itself in the background after a sync; decompileAll)
               envx link <project dir> <env>      queries from that dir use this env
               envx default <env>
 
@@ -90,6 +92,19 @@ public final class Main {
         switch (cmd) {
             case "env" -> {
                 return env(config, rest);
+            }
+            case "decompile" -> {
+                if (rest.contains("--stop")) {
+                    System.out.println(dev.envx.query.FullDecompile.stop(config));
+                    return 0;
+                }
+                String env = rest.stream().filter(x -> !x.startsWith("--")).findFirst().orElse(config.envFor(Path.of("").toAbsolutePath()));
+                if (env == null) throw new IllegalArgumentException("usage: envx decompile [<env>] [--status|--stop]");
+                if (rest.contains("--status")) {
+                    System.out.println(dev.envx.query.FullDecompile.status(config, env));
+                    return 0;
+                }
+                return dev.envx.query.FullDecompile.run(config, env);
             }
             case "link" -> {
                 need(rest, 2, "envx link <project dir> <env>");
@@ -302,6 +317,8 @@ public final class Main {
                 String logs = dev.envx.env.LogMirror.refresh(config, env, java.time.Duration.ZERO); // runtime evidence, outside snapshots
                 if (logs == null) dev.envx.query.LogService.warm(config.home(), env);
                 else System.out.println("server logs not copied: " + logs);
+                String decompile = dev.envx.query.FullDecompile.maybeStart(config, env); // separate process, idle priority
+                if (decompile != null) System.out.println(decompile);
             } catch (Exception e) {
                 if (!auto) throw e;
                 db.setMeta("autosync." + env + ".error", "last attempt " + java.time.Instant.now().toString().substring(0, 16) + "Z failed (" + e.getMessage() + ")");

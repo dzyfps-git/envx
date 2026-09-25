@@ -32,6 +32,15 @@ public final class Config {
     public double autoSyncHours = 6;
     /** Days of server logs and crash reports kept in the local mirror (env filter=errors, grep scope=logs). */
     public int logDays = 14;
+    /**
+     * After a sync, decompile every loaded jar not decompiled yet in a background process (idle priority), so
+     * {@code grep scope=source} covers all code and {@code source} reads from the cache. Each jar is done once.
+     */
+    public boolean decompileAll = true;
+    /** Threads (and CPUs) the background decompile may use. */
+    public int decompileThreads = 2;
+    /** Heap limit of the background decompile, in MB (Minecraft itself needs about 3 GB). */
+    public int decompileMemoryMb = 3072;
     public List<String> denyRoots = List.of(); // machine-specific: listed in the data home's config.json
 
     public static final class EnvDef {

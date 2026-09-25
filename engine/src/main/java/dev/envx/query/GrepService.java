@@ -15,8 +15,9 @@ import java.util.stream.Stream;
 
 /**
  * Regex search over text an environment actually contains: the server's mirrored configs and
- * datapacks, and the data/metadata files of every loaded mod jar (already extracted at index time).
- * Decompiled sources are searchable once they have been decompiled at least once.
+ * datapacks, the data/metadata files of every loaded mod jar (already extracted at index time), and the
+ * decompiled code of every loaded jar ({@link FullDecompile} fills it after a sync; until it is done, only
+ * classes read before). Answers name files {@code <mod>:<path>}.
  */
 public final class GrepService {
     private final QueryService q;
@@ -72,18 +73,15 @@ public final class GrepService {
                 if (Files.isDirectory(r) && s.includes((long) a[1])) roots.add(new Root(q.label((long) a[1]).split(" ")[0], r, List.of(), null));
             }
         }
-        if (scopes.contains("source")) {
-            Path d = home.resolve("decomp");
-            if (Files.isDirectory(d) && !s.scoped()) roots.add(new Root("decompiled", d, List.of(), null));
-            if (Files.isDirectory(d) && s.scoped()) { // decompile caches are named <jar sha prefix>-<mappings>-<decompiler>
-                for (long id : s.only()) {
-                    String sha = q.db().queryString("SELECT sha256 FROM artifact WHERE id=?", id);
-                    try (Stream<Path> dirs = Files.list(d)) {
-                        dirs.filter(x -> x.getFileName().toString().startsWith(sha.substring(0, 16)))
-                                .forEach(x -> roots.add(new Root("decompiled", x, List.of(), null)));
-                    }
-                }
+        String coverage = "";
+        if (scopes.contains("source")) { // each loaded jar's own cache folder, never other versions' (decomp/ keeps them all)
+            dev.envx.fabric.FabricBase base = dev.envx.fabric.FabricBase.forEnv(home, s.def().minecraft, s.def().mappings);
+            for (Object[] a : q.db().query("SELECT a.id, a.kind, a.sha256 FROM artifact a WHERE a.id IN (" + s.artifactSet() + ")",
+                    rs -> new Object[]{rs.getLong(1), rs.getString(2), rs.getString(3)})) {
+                Path r = SourceService.cacheDir(home, base, (String) a[1], (String) a[2]);
+                if (Files.isDirectory(r) && s.includes((long) a[0])) roots.add(new Root(q.label((long) a[0]).split(" ")[0], r, List.of(), null));
             }
+            coverage = FullDecompile.coverage(q, s).note();
         }
 
         if (scopes.contains("logs") && !s.historical()) { // the server's recent logs and crash reports (runtime evidence)
@@ -96,6 +94,7 @@ public final class GrepService {
 
         final Pattern pattern = p;
         List<Hit> hits = Collections.synchronizedList(new ArrayList<>());
+        java.util.concurrent.atomic.AtomicBoolean capped = new java.util.concurrent.atomic.AtomicBoolean();
         // A file's name can be the answer when its text never repeats it (an advancement's id is its file name).
         // A pattern that matches nonsense (".") would name every file, so names are only collected for real patterns.
         boolean names = !pattern.matcher("").find() && !pattern.matcher("qzx~").find();
@@ -105,6 +104,10 @@ public final class GrepService {
                 walk.forEach(entry -> {
                     String rel = (String) entry[0];
                     Path f = (Path) entry[1];
+                    if (hits.size() >= MAX_HITS) { // all decompiled code holds millions of lines; a broad pattern stops here
+                        capped.set(true);
+                        return;
+                    }
                     String lower = rel.toLowerCase(Locale.ROOT);
                     // Answers show files as <label>:<path>; a path copied from there filters too.
                     if (filter != null && !lower.contains(filter) && !(root.label.toLowerCase(Locale.ROOT) + ":" + lower).contains(filter)) return;
@@ -149,8 +152,8 @@ public final class GrepService {
             return out.finish("read one with grep . --path <path>");
         }
         if (hits.isEmpty()) {
-            return "No matches for /" + regex + "/ in " + sc + s.scopeNote() + (filter == null ? "" : " (path contains '" + filter + "')") + "."
-                    + (scopes.contains("source") ? "" : " Decompiled code: add scope=source (only classes decompiled before).")
+            return "No matches for /" + regex + "/ in " + sc + s.scopeNote() + (filter == null ? "" : " (path contains '" + filter + "')") + coverage + "."
+                    + (scopes.contains("source") ? "" : " Decompiled code: add scope=source.")
                     + (scopes.contains("resources") && !s.scoped() ? q.pastResources(s, pattern, filter) : "");
         }
         // Grouped by file: the path once, then line numbers in order. Reading a whole file with "." stays compact
@@ -160,7 +163,8 @@ public final class GrepService {
         long context = hits.stream().filter(Hit::context).count();
         Out out = new Out(budget);
         out.force((hits.size() - context) + " match(es) in " + files + " file(s), " + sc + s.scopeNote()
-                + (context > 0 ? "; lines marked N- complete the JSON block around a match" : ""));
+                + (capped.get() ? "; stopped after " + MAX_HITS + " matches, so counts are partial: narrow with mod: or path=" : "")
+                + coverage + (context > 0 ? "; lines marked N- complete the JSON block around a match" : ""));
         String current = null;
         for (Hit h : hits) {
             if (!h.file().equals(current)) {
@@ -177,6 +181,9 @@ public final class GrepService {
     }
 
     private record Hit(String file, int line, String text, boolean context) {}
+
+    /** Matching lines collected before a search stops (answers show a few dozen; this bounds memory and time). */
+    static final int MAX_HITS = 20_000;
 
     private static final Pattern JSON = Pattern.compile("\\.(json5?|mcmeta)$");
     /** Blocks up to this many lines are shown whole around a match. */
@@ -245,6 +252,7 @@ public final class GrepService {
         Stream<Object[]> files() throws IOException {
             if (list != null) return list.stream();
             return Files.walk(dir).filter(Files::isRegularFile)
+                    .filter(f -> !f.getFileName().toString().startsWith(".") && !f.getFileName().toString().endsWith(".tmp")) // markers, writes in progress
                     .map(f -> new Object[]{dir.relativize(f).toString().replace('\\', '/'), f});
         }
     }

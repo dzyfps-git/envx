@@ -13,7 +13,8 @@ Yarn Minecraft jar, unzipping mod jars, reading mappings and mixin configs, list
 - Write it in **plain Java 21**. The key libraries (ASM, mapping-io, tiny-remapper, Vineflower) are Java, and so
   are the user's mods. The code is mostly AI-written, so it sticks to one simple language with no Kotlin.
 - **Index bytecode, not decompiled source.** ASM gives classes, members, inheritance, class-level references and
-  mixin annotations in minutes. Source is decompiled lazily, one class at a time, and cached forever.
+  mixin annotations in minutes. Source is decompiled lazily, one class at a time, and cached forever. (Since 1.3.0
+  every loaded jar is also decompiled in the background after a sync, into the same cache: ADR 0011.)
 - **Content-addressed artifacts.** Each jar, including jars nested in other jars, is indexed once, keyed by SHA-256.
   An environment snapshot is a set of artifact ids, so "layers" are views and nothing is copied.
 - **Intermediary names are canonical** because they are what runs on the server and what Spark reports. Yarn is

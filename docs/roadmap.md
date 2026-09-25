@@ -9,11 +9,12 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - **The index is the product.** Agents use it from the tools they already run; any future app is a client of it.
 - **Efficiency first.** Few tools, compact answers that stay within a budget and say what they cut (ADR 0003, 0005).
 - **Read-only toward environments.** envx never writes to a server, a share or an instance folder.
-- **Index bytecode, decompile lazily.** Jars are indexed once by content hash; sources are decompiled on demand.
+- **Index bytecode, decompile in the background.** Jars are indexed once by content hash; sources are decompiled
+  after a sync at idle priority (and on demand before that), each jar once (ADR 0011).
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
   (`bench/`).
 
-## Status: 1.2.1 (2026-09-25)
+## Status: 1.3.0 (2026-09-25)
 - 0.1–0.2: environment index, eight tools, `mod:` scoping, capped answers that name what they cut, measurement,
   an A/B switch for agents.
 - 0.3: history snapshots, `env import`, `env=<name>@<version>`, use-time auto-sync; empty results point to the past
@@ -37,10 +38,11 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   member when several share a name, and marks field uses as reads or writes ("never read" answers need no grep).
   1.2.1: `grep` names files whose path matches (an advancement's id is its file name), accepts paths as answers
   show them (`<mod>:<path>`), and a no-match search spends at most 5 s on past versions.
+- 1.3: indexing study decisions (ADR 0011). After a sync, every loaded jar is decompiled in a background process at
+  idle priority, so `grep scope=source` searches all code instead of classes read before (it found more in 18 of 24
+  logged searches); `envx decompile --status|--stop`.
 
 ## After 1.0
-- A baseline and indexing optimization study: compare envx's approach with other environment indexes on the same
-  questions (agent efficiency, context use, query speed, index size, decompilation strategy) and adopt what wins.
 - Adaptive, reusable knowledge: notes anchored to what they describe (a jar hash, an environment, a project) and
   reused while the anchor is unchanged, with indexed facts kept separate from AI-derived interpretation, which
   carries its evidence, provenance and verification state.
