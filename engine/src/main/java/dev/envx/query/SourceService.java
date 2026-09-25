@@ -1,6 +1,7 @@
 package dev.envx.query;
 
 import dev.envx.fabric.FabricBase;
+import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 import net.fabricmc.tinyremapper.TinyUtils;
@@ -324,24 +325,61 @@ public final class SourceService {
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
-    /** Remaps a mod jar from intermediary to Yarn once, with Minecraft on the classpath so overrides get renamed too. */
+    /**
+     * Remaps a mod jar from intermediary to Yarn once, with Minecraft on the classpath so overrides get renamed too.
+     * A mod whose own method gets the same Yarn name as an inherited Minecraft one (its {@code clear()} next to
+     * {@code Clearable.method_5448}, Yarn {@code clear}) cannot be remapped as is; it is remapped again with those
+     * Minecraft members left under their runtime names.
+     */
     static synchronized Path remapped(Path home, String sha, FabricBase base) throws IOException {
         Path out = home.resolve("remapped").resolve(sha.substring(0, 16) + "-" + base.id() + ".jar");
         if (Files.exists(out)) return out;
         Path in = home.resolve("artifacts").resolve(sha.substring(0, 2)).resolve(sha + ".jar");
         Files.createDirectories(out.getParent());
         Path tmp = out.resolveSibling(out.getFileName() + "." + ProcessHandle.current().pid() + ".tmp"); // another process may remap the same jar
-        Files.deleteIfExists(tmp);
+        java.util.Set<String> keep = new java.util.HashSet<>();
+        for (int attempt = 0; ; attempt++) {
+            Files.deleteIfExists(tmp);
+            java.io.ByteArrayOutputStream log = new java.io.ByteArrayOutputStream();
+            try {
+                remap(in, tmp, base, keep, log);
+                break;
+            } catch (RuntimeException e) {
+                Files.deleteIfExists(tmp);
+                int before = keep.size();
+                keep.addAll(conflicting(log.toString(java.nio.charset.StandardCharsets.UTF_8)));
+                if (attempt >= 2 || keep.size() == before) throw e;
+            }
+        }
+        Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        return out;
+    }
+
+    private static void remap(Path in, Path tmp, FabricBase base, java.util.Set<String> keep, java.io.OutputStream log) throws IOException {
+        IMappingProvider yarn = TinyUtils.createTinyMappingProvider(base.mappingsFile(), "intermediary", "named");
+        IMappingProvider mappings = keep.isEmpty() ? yarn : acceptor -> yarn.load(new IMappingProvider.MappingAcceptor() {
+            @Override public void acceptClass(String src, String dst) { acceptor.acceptClass(src, dst); }
+            @Override public void acceptMethod(IMappingProvider.Member m, String dst) {
+                if (!keep.contains(m.owner + "/" + m.name + m.desc)) acceptor.acceptMethod(m, dst);
+            }
+            @Override public void acceptMethodArg(IMappingProvider.Member m, int lvIndex, String dst) { acceptor.acceptMethodArg(m, lvIndex, dst); }
+            @Override public void acceptMethodVar(IMappingProvider.Member m, int lvIndex, int startOpIdx, int asmIndex, String dst) {
+                acceptor.acceptMethodVar(m, lvIndex, startOpIdx, asmIndex, dst);
+            }
+            @Override public void acceptField(IMappingProvider.Member f, String dst) {
+                if (!keep.contains(f.owner + "/" + f.name + f.desc)) acceptor.acceptField(f, dst);
+            }
+        });
         TinyRemapper remapper = TinyRemapper.newRemapper()
-                .withMappings(TinyUtils.createTinyMappingProvider(base.mappingsFile(), "intermediary", "named"))
+                .withMappings(mappings)
                 .ignoreConflicts(true)
                 .renameInvalidLocals(true)
                 .extension(new MixinExtension())
                 .build();
-        // tiny-remapper's mixin extension prints "[WARN] Cannot remap ..." to stdout for every
-        // non-remapped mixin target; harmless here, but it would corrupt CLI output.
+        // tiny-remapper reports on stdout ("[WARN] Cannot remap ..." for every non-remapped mixin target, and name
+        // conflicts); it would corrupt CLI output, and the conflicts are read from it.
         java.io.PrintStream realOut = System.out;
-        System.setOut(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
+        System.setOut(new java.io.PrintStream(log, true, java.nio.charset.StandardCharsets.UTF_8));
         try (OutputConsumerPath consumer = new OutputConsumerPath.Builder(tmp).assumeArchive(true).build()) {
             remapper.readClassPath(base.intermediaryJar());
             remapper.readInputs(in);
@@ -350,7 +388,19 @@ public final class SourceService {
             remapper.finish();
             System.setOut(realOut);
         }
-        Files.move(tmp, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /** {@code [WARN]   METHODs a/B/[clear, net/minecraft/class_3829/method_5448]()V -> clear}: the inherited members. */
+    private static final Pattern CONFLICT = Pattern.compile("(?m)^\\[WARN\\]\\s+(?:METHOD|FIELD)s\\s+\\S+?/\\[([^\\]]*)\\](\\S*) -> \\S+\\s*$");
+
+    static java.util.Set<String> conflicting(String log) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        var m = CONFLICT.matcher(log);
+        while (m.find()) {
+            for (String member : m.group(1).split(",\\s*")) {
+                if (member.contains("/")) out.add(member.trim() + m.group(2));
+            }
+        }
         return out;
     }
 }
