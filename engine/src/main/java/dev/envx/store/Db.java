@@ -53,6 +53,13 @@ public final class Db implements AutoCloseable {
 
     private static Db openOnce(Path home, boolean readOnly) throws SQLException {
         Path file = home.resolve("index.sqlite");
+        if (!readOnly) {
+            try {
+                java.nio.file.Files.createDirectories(home); // the data home is created by the first write, not before
+            } catch (java.io.IOException e) {
+                throw new SQLException("cannot create " + home + ": " + e.getMessage(), e);
+            }
+        }
         var cfg = new org.sqlite.SQLiteConfig();
         cfg.setReadOnly(readOnly);
         Connection c = DriverManager.getConnection("jdbc:sqlite:" + file.toAbsolutePath(), cfg.toProperties());

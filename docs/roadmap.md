@@ -14,7 +14,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
   (`bench/`).
 
-## Status: 1.4.3 (2026-09-25)
+## Status: 1.5.0 (2026-09-25)
 - 0.1–0.2: environment index, eight tools, `mod:` scoping, capped answers that name what they cut, measurement,
   an A/B switch for agents.
 - 0.3: history snapshots, `env import`, `env=<name>@<version>`, use-time auto-sync; empty results point to the past
@@ -53,12 +53,24 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   on a large pack); `envx traces` lists folders where agents worked without envx and whether they have envx's
   instructions, and counts Forge/NeoForge work separately; first-run status shows the setup steps; the Loom cache is
   found through `GRADLE_USER_HOME`.
+- 1.5: the engine side of the desktop app (ADR 0013). `envx catalog` lists supported baselines and published packs
+  with sizes; `envx catalog install <id>` downloads a baseline from the official sources. Nothing is downloaded or
+  created unasked: syncs no longer fetch a baseline by themselves, the Loom cache is no longer read, and the data
+  home appears with the first install. Own servers are refused unless they run a supported baseline.
+  `envx app-server` is the app's JSON-lines connection.
+
+## Next: the desktop app (ADR 0013)
+A Windows app that starts empty and offers a curated catalog: supported baselines and modpacks prepared by the
+maintainer, published as recipes (official download sources and hashes, never third-party files) and built on the
+user's PC. Milestones: packs (export tool, Modrinth, CurseForge, the user's own copy for blocked files), the Electron
+app (catalog, downloads, library, own server, agents, trace report, settings), an unsigned per-user installer with the
+engine and its Java runtime inside, draft releases.
 
 ## After 1.0
 - Adaptive, reusable knowledge: notes anchored to what they describe (a jar hash, an environment, a project) and
   reused while the anchor is unchanged, with indexed facts kept separate from AI-derived interpretation, which
   carries its evidence, provenance and verification state.
-- A desktop client ("mission control") for environments, projects, agent sessions, builds and reviews.
+- Agent sessions inside the desktop app (embedded Claude Code and Codex terminals), builds and reviews.
 - A safe modpack updater: what the server customized relative to the pack, config conflicts on update, backups and
   rollback.
 

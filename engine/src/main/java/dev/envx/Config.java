@@ -41,6 +41,8 @@ public final class Config {
     public int decompileThreads = 2;
     /** Heap limit of the background decompile, in MB (Minecraft itself needs about 3 GB). */
     public int decompileMemoryMb = 3072;
+    /** The published catalog of supported baselines and modpacks (recipes only; ADR 0013). */
+    public String catalogUrl = "https://raw.githubusercontent.com/dzyfps-git/envx-catalog/main/index.json";
     public List<String> denyRoots = List.of(); // machine-specific: listed in the data home's config.json
 
     public static final class EnvDef {
@@ -88,8 +90,7 @@ public final class Config {
     }
 
     public static Config load() throws IOException {
-        Path home = resolveHome();
-        Files.createDirectories(home);
+        Path home = resolveHome(); // not created here: a fresh install stays empty until something is installed
         Path file = home.resolve("config.json");
         Config c = Files.exists(file) ? GSON.fromJson(Files.readString(file), Config.class) : new Config();
         if (c.environments == null) c.environments = new LinkedHashMap<>();
@@ -100,6 +101,7 @@ public final class Config {
     }
 
     public void save() throws IOException {
+        Files.createDirectories(home);
         Files.writeString(home.resolve("config.json"), GSON.toJson(this));
     }
 

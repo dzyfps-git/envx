@@ -21,11 +21,12 @@ final class Status {
             """;
 
     static final String GETTING_STARTED = """
-            Getting started (one time)
-              envx init                          Minecraft + Yarn base (from your Loom cache, else downloaded)
-              envx env add <name> <source>       your server: a folder, \\\\host\\share, or ssh://host/path (read-only)
-              envx env sync <name>               index its mods, configs and logs
-              envx link <mod project> <name>     optional: agents working in that project use this server
+            Getting started (pick what you need; nothing is downloaded until you do)
+              envx catalog                       supported baselines and packs, with sizes
+              envx catalog install <id>          download and index one (e.g. fabric-1.20.1)
+              envx env add <name> <source>       optional: your own server on a supported baseline, read-only
+                                                 (a folder, \\\\host\\share, or ssh://host/path), then envx env sync <name>
+              envx link <mod project> <name>     optional: agents working in that project use this environment
               envx setup --claude --codex --path register with Claude Code and Codex, and put envx on your PATH
             """;
 

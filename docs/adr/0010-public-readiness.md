@@ -8,7 +8,8 @@ drive letter, launchers and Java paths were Windows-only, and every end-to-end t
 so a fresh checkout or CI could only run unit tests.
 
 ## Decisions
-1. **Base without Loom.** `envx init` (and the first sync) takes Minecraft + Yarn from the Loom cache when present,
+1. **Base without Loom.** (Superseded by ADR 0013 in 1.5.0: the Loom cache is no longer read, and a baseline is
+   downloaded only when the user installs it.) `envx init` (and the first sync) takes Minecraft + Yarn from the Loom cache when present,
    else downloads the client and server jars from Mojang (SHA-1 from Mojang's version metadata, server bundler
    entries by their SHA-256) and Yarn from the Fabric maven (the maven's `.sha256`/`.sha1`), then merges and remaps
    locally with tiny-remapper. A mismatch refuses the file. For 1.20.1 / Yarn build.10 the result has the same 7436

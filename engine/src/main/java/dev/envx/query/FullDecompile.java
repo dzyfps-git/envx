@@ -213,6 +213,18 @@ public final class FullDecompile {
         }
     }
 
+    /** {complete, total} jars with code in {@code env}'s current snapshot, for the app. */
+    public static int[] progress(Config config, String env) throws SQLException {
+        try (Db db = Db.open(config.home(), true)) {
+            Coverage c = coverage(new QueryService(config, db), Scope.resolve(config, db, env, null));
+            return new int[]{c.complete(), c.total()};
+        }
+    }
+
+    public static boolean isRunning(Path home) {
+        return running(home).isPresent();
+    }
+
     /** {@code envx decompile --stop}: ends a running background decompile. */
     public static String stop(Config config) {
         Optional<ProcessHandle> p = running(config.home());

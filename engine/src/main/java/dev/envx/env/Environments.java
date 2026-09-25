@@ -70,10 +70,11 @@ public final class Environments {
                 throw new IllegalArgumentException("Source is inside a denied root: " + src);
             }
         }
-        long mcId = ensureBase(def, progress);
         // Nothing below is committed until the snapshot transaction, so a source dropping out
         // mid-sync (power cut, share disconnect) leaves the previous snapshot current.
         EnvironmentSource source = EnvironmentSource.firstReachable(def.sources, progress);
+        dev.envx.catalog.ServerCheck.require(source, def); // only servers on a supported baseline (ADR 0013)
+        long mcId = ensureBase(def, progress);
         return capture(env, mcId, source, "sync", null, progress);
     }
 
@@ -88,8 +89,10 @@ public final class Environments {
         Path dir = folder.toAbsolutePath().normalize();
         if (config.isDenied(dir)) throw new IllegalArgumentException("Folder is inside a denied root: " + dir);
         if (!Files.isDirectory(dir.resolve("mods"))) throw new IllegalArgumentException("No mods/ folder in " + dir + "; pass a server folder");
+        FolderSource source = new FolderSource(dir);
+        dev.envx.catalog.ServerCheck.require(source, def);
         long mcId = ensureBase(def, progress);
-        return capture(env, mcId, new FolderSource(dir), "import", label, progress);
+        return capture(env, mcId, source, "import", label, progress);
     }
 
     private Config.EnvDef def(String env) {
@@ -100,7 +103,7 @@ public final class Environments {
 
     private long ensureBase(Config.EnvDef def, Consumer<String> progress) throws IOException, SQLException {
         FabricBase base = FabricBase.forEnv(home, def.minecraft, def.mappings);
-        base.provision(FabricBase.gradleHome(), progress);
+        if (!base.isProvisioned()) throw new IllegalStateException(dev.envx.catalog.Baselines.missing(def)); // never downloaded unasked
         progress.accept("loading mappings " + base.id());
         indexer = new Indexer(db, home, base.loadMappings());
         String mcSha = hashLocal(base.intermediaryJar());

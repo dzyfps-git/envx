@@ -12,8 +12,9 @@ question with and without envx), agents used a median of 88% fewer tokens at equ
 questions describe a private server and are not published; the harness is in `bench/` (`bench/README.md`).
 
 ## What envx indexes
-- Minecraft 1.20.1: intermediary runtime names plus Yarn 1.20.1+build.10, copied from your Loom cache when it has
-  them, otherwise downloaded from Mojang and the Fabric maven (hash-checked) and merged and remapped locally.
+- A supported baseline, when you install it: Minecraft 1.20.1 with intermediary runtime names plus Yarn
+  1.20.1+build.10, downloaded from Mojang and the Fabric maven (hash-checked) and merged and remapped locally.
+  Nothing is downloaded until you choose it (ADR 0013).
 - Every jar in the server's `mods/` folder, including jar-in-jar. Each jar is indexed once, keyed by its content hash.
   Only mods that the server's `latest.log` shows as loaded count as active.
 - Classes, members, inheritance, class-level references, `fabric.mod.json`, and mixins (configs + refmaps).
@@ -31,7 +32,7 @@ cd engine
 
 ## Getting started
 ```
-engine/build/install/envx/bin/envx init              # Minecraft + Yarn base (Loom cache, else ~70 MB download)
+engine/build/install/envx/bin/envx catalog install fabric-1.20.1   # the baseline: Minecraft 1.20.1 + Yarn (~75 MB)
 envx env add myserver /path/to/server                # or \\host\share, or ssh://host/path (read-only)
 envx env sync myserver                               # index its mods, configs and logs
 envx link /path/to/my-mod myserver                   # queries from that project use this environment

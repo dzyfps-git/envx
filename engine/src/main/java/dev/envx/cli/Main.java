@@ -28,7 +28,8 @@ public final class Main {
               envx stop                         = envx decompile --stop
 
             Setup
-              envx init [<minecraft> <yarn>]    Minecraft + Yarn base (from the Loom cache, else downloaded and hash-checked)
+              envx catalog                      supported baselines and packs, installed or not, with sizes
+              envx catalog install <id>         download and index one (from the official sources, hash-checked)
 
             Environments
               envx env add <name> <source> [<fallback source>...]   source: folder, \\\\host\\share, or ssh://host/path
@@ -77,6 +78,9 @@ public final class Main {
         if (args[0].equals("mcp")) {
             McpServer.run();
             return;
+        }
+        if (args[0].equals("app-server")) { // the desktop app's connection (ADR 0013); reads stdin until the app closes it
+            System.exit(dev.envx.app.AppServer.run(System.in, System.out));
         }
         if (args[0].equals("api")) { // no auto-sync, no call-log text: a program's interface (docs/api.md)
             if (args.length > 1 && args[1].equals("--version")) {
@@ -167,29 +171,11 @@ public final class Main {
                 }
                 return 0;
             }
-            case "init" -> {
-                // The base layer (Minecraft + Yarn) for each configured environment, or for the versions given.
-                List<String[]> bases = new ArrayList<>();
-                if (!rest.isEmpty()) {
-                    need(rest, 2, "envx init [<minecraft> <yarn>]   e.g. envx init 1.20.1 1.20.1+build.10");
-                    bases.add(new String[]{rest.get(0), "yarn:" + rest.get(1)});
-                } else {
-                    for (Config.EnvDef d : config.environments.values()) bases.add(new String[]{d.minecraft, d.mappings});
-                    if (bases.isEmpty()) {
-                        Config.EnvDef d = new Config.EnvDef();
-                        bases.add(new String[]{d.minecraft, d.mappings});
-                    }
-                }
-                for (String[] b : bases.stream().map(Arrays::asList).distinct().map(l -> l.toArray(String[]::new)).toList()) {
-                    var base = dev.envx.fabric.FabricBase.forEnv(config.home(), b[0], b[1]);
-                    base.provision(dev.envx.fabric.FabricBase.gradleHome(), System.out::println);
-                    System.out.println("base " + base.id() + ": ready (" + base.dir + ")");
-                }
-                if (config.environments.isEmpty()) {
-                    System.out.println("next: envx env add <name> <server folder | \\\\host\\share | ssh://host/path>, then envx env sync <name>,"
-                            + " then envx setup --claude --codex");
-                }
-                return 0;
+            case "init" -> { // the default baseline; kept for scripts written before the catalog
+                return dev.envx.catalog.CatalogCommand.run(config, List.of("install", dev.envx.catalog.Baselines.SUPPORTED.getFirst().id()), System.out);
+            }
+            case "catalog" -> {
+                return dev.envx.catalog.CatalogCommand.run(config, rest, System.out);
             }
             case "setup" -> {
                 return AgentSetup.setup(config, rest);

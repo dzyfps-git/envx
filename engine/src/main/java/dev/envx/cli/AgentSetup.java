@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
  * </ul>
  * Instruction blocks go to linked projects ({@code envx link}) plus any {@code setup --project} dirs.
  */
-final class AgentSetup {
+public final class AgentSetup {
     private static final String BEGIN = "<!-- envx:begin (managed by `envx setup`; edits inside this block are overwritten) -->";
     private static final String BEGIN_PREFIX = "<!-- envx:begin";
     private static final String END = "<!-- envx:end -->";
@@ -175,6 +175,11 @@ final class AgentSetup {
                 + "[Environment]::SetEnvironmentVariable('ENVX_PATH_REFRESH', $null, 'User'); 'added' }";
         String out = exec(List.of("powershell", "-NoProfile", "-NonInteractive", "-Command", script), false).trim();
         System.out.println(app + ": " + out + (out.equals("added") ? " to your user PATH; open a new terminal and type: envx" : ""));
+    }
+
+    /** {@link #summary} for callers outside this package (the app server). */
+    public static String summaryLine(Config config) throws IOException {
+        return summary(config);
     }
 
     /** One line for `envx status`: ON, OFF, or which parts are on. */
