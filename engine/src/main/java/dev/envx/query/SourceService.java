@@ -1,5 +1,6 @@
 package dev.envx.query;
 
+import dev.envx.store.Packs;
 import dev.envx.fabric.FabricBase;
 import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.OutputConsumerPath;

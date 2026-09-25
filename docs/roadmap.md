@@ -14,7 +14,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
   (`bench/`).
 
-## Status: 1.4.1 (2026-09-25)
+## Status: 1.4.2 (2026-09-25)
 - 0.1–0.2: environment index, eight tools, `mod:` scoping, capped answers that name what they cut, measurement,
   an A/B switch for agents.
 - 0.3: history snapshots, `env import`, `env=<name>@<version>`, use-time auto-sync; empty results point to the past
@@ -48,6 +48,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   Code search reads one packed file per decompiled jar: a cold search on a spinning disk went from 21 s to 4 s.
   1.4.1, from the first trace report: resource search reads packed files too (cold 55 s -> 1.6 s); grep says when the
   server's current log has matching lines it did not search; `env filter` says it matches jar file names.
+  1.4.2: a sync packs each new jar's resources as it extracts them (no background process needed for that).
 
 ## After 1.0
 - Adaptive, reusable knowledge: notes anchored to what they describe (a jar hash, an environment, a project) and

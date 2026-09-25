@@ -1,4 +1,4 @@
-package dev.envx.query;
+package dev.envx.store;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 public final class Packs {
     /** The pack's file name inside its folder (dot files are never searched themselves). */
     public static final String NAME = ".pack";
-    static final char ENTRY = '\u0001';
+    public static final char ENTRY = '\u0001';
 
     private Packs() {}
 

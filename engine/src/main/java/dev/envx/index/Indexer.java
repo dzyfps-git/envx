@@ -215,6 +215,13 @@ public final class Indexer {
             }
             ps.executeBatch();
         }
+        if (Files.isDirectory(root)) { // one file for grep instead of thousands (ADR 0011)
+            try {
+                dev.envx.store.Packs.write(root, f -> true);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 
     private void storeBytes(ParsedJar pj) {

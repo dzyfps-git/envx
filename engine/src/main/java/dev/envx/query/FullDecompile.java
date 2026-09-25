@@ -1,5 +1,6 @@
 package dev.envx.query;
 
+import dev.envx.store.Packs;
 import dev.envx.Config;
 import dev.envx.env.AutoSync;
 import dev.envx.fabric.FabricBase;
@@ -64,8 +65,9 @@ public final class FullDecompile {
     }
 
     /**
-     * Extracted-resource folders ({@code resources/<jar sha>}, any version) without a {@link Packs pack} yet. They never
-     * change, so each is packed once; past versions' folders are packed too (grep's past-version hint reads them).
+     * Extracted-resource folders ({@code resources/<jar sha>}, any version) without a {@link Packs pack}: those indexed
+     * before 1.4.1 (a sync packs new ones as it extracts them). Past versions' folders are packed too (grep's
+     * past-version hint reads them).
      */
     static List<Path> unpackedResources(Path home) {
         Path root = home.resolve("resources");
