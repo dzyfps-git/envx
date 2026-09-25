@@ -335,7 +335,7 @@ public final class QueryService {
         Map<String, String> memberNames = new HashMap<>();
         Map<String, String> classNames = new HashMap<>();
         Map<String, java.util.Set<String>> calls = new TreeMap<>(); // callee -> callers
-        scan(users, (u, mn, line, o, n, d, callers) -> {
+        scan(users, (u, mn, line, op, o, n, d, callers) -> {
             if (n == null || d == null || !d.startsWith("(") || n.startsWith("<") || own.contains(o) || o.startsWith("java/")) return;
             String name = n;
             if (n.startsWith("method_")) { // intermediary names are unique across Minecraft: one lookup gives the Yarn name
@@ -1032,32 +1032,111 @@ public final class QueryService {
     public String refs(Scope s, String target, int budget) throws SQLException, IOException {
         Target t = Target.parse(target);
         String clsName = t.cls() != null ? t.cls() : target;
-        List<ClassRow> classes = findClasses(s, clsName, 5);
+        List<ClassRow> classes = findClasses(s, clsName, t.member() == null ? 5 : 25);
         if (classes.isEmpty()) return "No class matching '" + clsName + "'." + past.classes(s, clsName);
         ClassRow c = classes.getFirst();
-        List<ClassRow> users = referencing(s, c.name());
         Out out = new Out(budget);
-        if (t.member() == null) return classRefs(s, c, users, out);
+        if (t.member() == null) return classRefs(s, c, referencing(s, c.name()), out);
 
+        // Several classes can share a simple name (ServerConfig): take one that has the member, name the others.
+        List<ClassRow> having = new ArrayList<>();
+        for (ClassRow k : classes) if (!resolveMember(s, k, t.member(), t.desc()).isEmpty()) having.add(k);
+        if (!having.isEmpty()) c = having.getFirst();
         List<Resolved> resolved = resolveMember(s, c, t.member(), t.desc());
         if (resolved.isEmpty()) return "No member '" + t.member() + "' on " + classLine(c) + ".";
         MemberRow target0 = resolved.getFirst().member();
         String owner = resolved.getFirst().owner().name();
         String name = target0.name();
         String desc = t.desc() != null || resolved.size() == 1 ? target0.desc() : null;
-        if (!owner.equals(c.name())) users.addAll(referencing(s, owner)); // inherited: calls may name either class as owner
-        out.force("call sites of " + memberLine(resolved.getFirst().owner(), target0) + (desc == null ? " (all overloads)" : "") + s.scopeNote());
-        int[] sites = {0};
-        scan(users, (u, mn, line, o, n, d, callers) -> {
-            if (n == null || !n.equals(name) || !(o.equals(owner) || o.equals(c.name())) || (desc != null && !desc.equals(d))) return;
+        boolean field = "f".equals(target0.kind());
+
+        // Bytecode names the receiver's static type, so player.damage(..) names PlayerEntity, and a class's own
+        // accesses are not in class_ref: scan the declaring class, the named class and subclasses that do not redeclare it.
+        // Scan order matters when the list is capped: the class itself, direct users, then the subclasses and theirs.
+        java.util.Set<String> owners = new java.util.LinkedHashSet<>(List.of(owner, c.name()));
+        Map<Long, ClassRow> users = new LinkedHashMap<>();
+        for (ClassRow k : List.of(resolved.getFirst().owner(), c)) if (s.includes(k.artifactId())) users.putIfAbsent(k.id(), k);
+        for (ClassRow u : referencing(s, new ArrayList<>(owners))) users.putIfAbsent(u.id(), u);
+        List<ClassRow> subs = subtypes(s, owner, name, desc, SUBTYPE_LIMIT);
+        List<String> subNames = new ArrayList<>();
+        for (ClassRow sub : subs) {
+            owners.add(sub.name());
+            subNames.add(sub.name());
+            if (s.includes(sub.artifactId())) users.putIfAbsent(sub.id(), sub);
+        }
+        for (ClassRow u : referencing(s, subNames)) users.putIfAbsent(u.id(), u);
+        List<ClassRow> userList = new ArrayList<>(users.values());
+
+        out.force((field ? "uses of " : "call sites of ") + memberLine(resolved.getFirst().owner(), target0)
+                + (desc == null ? " (all overloads)" : "") + s.scopeNote());
+        int[] sites = {0}, reads = {0}, writes = {0};
+        scan(userList, (u, mn, line, op, o, n, d, callers) -> {
+            if (n == null || !n.equals(name) || !owners.contains(o) || (desc != null && !desc.equals(d))) return;
             sites[0]++;
-            out.line("  " + Sig.dotted(u.named()) + "." + callerSig(mn, callers) + (line > 0 ? " L" + line : "") + "  | " + label(u.artifactId()));
+            String access = "";
+            if (op == org.objectweb.asm.Opcodes.GETFIELD || op == org.objectweb.asm.Opcodes.GETSTATIC) {
+                reads[0]++;
+                access = " (read)";
+            } else if (op == org.objectweb.asm.Opcodes.PUTFIELD || op == org.objectweb.asm.Opcodes.PUTSTATIC) {
+                writes[0]++;
+                access = " (write)";
+            }
+            out.line("  " + Sig.dotted(u.named()) + "." + callerSig(mn, callers) + (line > 0 ? " L" + line : "") + access + "  | " + label(u.artifactId()));
         });
-        if (users.size() > SCAN_LIMIT) out.force("(scanned first " + SCAN_LIMIT + " of " + users.size() + " referencing classes; add mod:<id> to narrow)");
-        if (sites[0] == 0) out.force("no direct call sites found");
-        overriders(s, resolved.getFirst().owner(), target0, out);
+        if (userList.size() > SCAN_LIMIT) out.force("(scanned first " + SCAN_LIMIT + " of " + userList.size() + " referencing classes; add mod:<id> to narrow)");
+        if (sites[0] == 0) out.force("no direct " + (field ? "uses" : "call sites") + " found");
+        else if (field) out.force(reads[0] + " read(s), " + writes[0] + " write(s)" + (reads[0] == 0 ? ": never read in loaded bytecode" : ""));
+        if (subs.size() >= SUBTYPE_LIMIT) out.force("(first " + SUBTYPE_LIMIT + " subclasses included as receivers)");
+        if (having.size() > 1) {
+            List<String> others = new ArrayList<>();
+            for (ClassRow k : having.subList(1, Math.min(having.size(), 6))) others.add(Sig.dotted(k.named()) + " | " + label(k.artifactId()));
+            out.force("also has '" + t.member() + "': " + String.join("; ", others) + " (pass the full class name or mod:<id>)");
+        }
+        if (!field) overriders(s, resolved.getFirst().owner(), target0, out);
         out.force(coverage(s));
         return out.finish("narrow with a descriptor or mod:<id>");
+    }
+
+    private static final int SUBTYPE_LIMIT = 300;
+
+    /** Subclasses of {@code root} (transitively, in this scope) that do not declare {@code name}{@code desc} themselves. */
+    private List<ClassRow> subtypes(Scope s, String root, String name, String desc, int limit) throws SQLException {
+        List<ClassRow> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>(List.of(root));
+        List<String> level = List.of(root);
+        while (!level.isEmpty() && out.size() < limit) { // one query per hierarchy level, not per class
+            List<ClassRow> found = new ArrayList<>();
+            for (List<String> chunk : chunks(level)) {
+                found.addAll(db.query("SELECT id, name, named, artifact_id, super, interfaces, access FROM class c WHERE c.super IN ("
+                                + "?,".repeat(chunk.size() - 1) + "?) AND " + s.artifacts("c"),
+                        rs -> new ClassRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getString(5), rs.getString(6), rs.getInt(7)),
+                        chunk.toArray()));
+            }
+            found.removeIf(c -> !seen.add(c.name()));
+            java.util.Set<Long> redeclare = new java.util.HashSet<>();
+            for (List<ClassRow> chunk : chunks(found)) { // its own member: calls on it are not calls of this one
+                List<Object> args = new ArrayList<>();
+                chunk.forEach(c -> args.add(c.id()));
+                args.add(name);
+                if (desc != null) args.add(desc);
+                redeclare.addAll(db.query("SELECT DISTINCT class_id FROM member WHERE class_id IN (" + "?,".repeat(chunk.size() - 1)
+                        + "?) AND name=?" + (desc != null ? " AND descriptor=?" : ""), rs -> rs.getLong(1), args.toArray()));
+            }
+            List<String> next = new ArrayList<>();
+            for (ClassRow c : found) {
+                if (redeclare.contains(c.id()) || out.size() >= limit) continue;
+                out.add(c);
+                next.add(c.name());
+            }
+            level = next;
+        }
+        return out;
+    }
+
+    private static <T> List<List<T>> chunks(List<T> list) {
+        List<List<T>> out = new ArrayList<>();
+        for (int i = 0; i < list.size(); i += 500) out.add(list.subList(i, Math.min(list.size(), i + 500)));
+        return out;
     }
 
     private static final int SCAN_LIMIT = 400;
@@ -1075,7 +1154,7 @@ public final class QueryService {
         Map<String, String> targetNames = new HashMap<>();
         for (MemberRow m : members(c.id())) targetNames.put(m.name() + m.desc(), m.named());
         Map<ClassRow, Map<String, java.util.Set<String>>> uses = new LinkedHashMap<>(); // class -> caller -> members used
-        scan(users, (u, mn, line, o, n, d, callers) -> {
+        scan(users, (u, mn, line, op, o, n, d, callers) -> {
             if (!o.equals(c.name())) return;
             String used = n == null ? "(type)" : targetNames.getOrDefault(n + d, n);
             uses.computeIfAbsent(u, k -> new LinkedHashMap<>())
@@ -1089,12 +1168,36 @@ public final class QueryService {
         return out.finish("pass Class.member for exact call sites");
     }
 
+    private final Map<String, java.util.Set<Long>> resultIds = new HashMap<>();
+
+    /** The artifact ids {@link Scope#results} admits, computed once per scope (filtering in SQL made big joins slow). */
+    private java.util.Set<Long> resultIds(Scope s) throws SQLException {
+        String key = s.results("x");
+        java.util.Set<Long> ids = resultIds.get(key);
+        if (ids == null) {
+            ids = new java.util.HashSet<>(db.query("SELECT x.artifact_id FROM (SELECT artifact_id FROM snapshot_artifact) x WHERE " + key, rs -> rs.getLong(1)));
+            resultIds.put(key, ids);
+        }
+        return ids;
+    }
+
     private List<ClassRow> referencing(Scope s, String owner) throws SQLException {
-        return db.query("""
-                SELECT c.id, c.name, c.named, c.artifact_id, c.super, c.interfaces, c.access
-                FROM class_ref r JOIN class c ON c.id=r.class_id WHERE r.owner=? AND %s""".formatted(s.results("c")),
-                rs -> new ClassRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getString(5), rs.getString(6), rs.getInt(7)),
-                owner);
+        return referencing(s, List.of(owner));
+    }
+
+    private List<ClassRow> referencing(Scope s, List<String> owners) throws SQLException {
+        List<ClassRow> out = new ArrayList<>();
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        for (List<String> chunk : chunks(owners)) {
+            for (ClassRow c : db.query("""
+                    SELECT c.id, c.name, c.named, c.artifact_id, c.super, c.interfaces, c.access
+                    FROM class_ref r JOIN class c ON c.id=r.class_id WHERE r.owner IN (%s)""".formatted("?,".repeat(chunk.size() - 1) + "?"),
+                    rs -> new ClassRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getString(5), rs.getString(6), rs.getInt(7)),
+                    chunk.toArray())) {
+                if (resultIds(s).contains(c.artifactId()) && seen.add(c.id())) out.add(c);
+            }
+        }
+        return out;
     }
 
     /** One line stating what an answer covers, so a complete answer can be trusted without re-checking it by hand. */
@@ -1108,7 +1211,7 @@ public final class QueryService {
     @FunctionalInterface
     private interface Hit {
         /** {@code name}/{@code desc} are null for type-only uses (new, instanceof, casts, class literals). */
-        void on(ClassRow user, MethodNode caller, int line, String owner, String name, String desc, Map<String, MemberRow> callerMembers)
+        void on(ClassRow user, MethodNode caller, int line, int opcode, String owner, String name, String desc, Map<String, MemberRow> callerMembers)
                 throws SQLException;
     }
 
@@ -1133,11 +1236,11 @@ public final class QueryService {
                         for (AbstractInsnNode insn : mn.instructions) {
                             switch (insn) {
                                 case LineNumberNode ln -> line = ln.line;
-                                case MethodInsnNode mi -> hit.on(u, mn, line, mi.owner, mi.name, mi.desc, callers);
-                                case FieldInsnNode fi -> hit.on(u, mn, line, fi.owner, fi.name, fi.desc, callers);
-                                case org.objectweb.asm.tree.TypeInsnNode ti -> hit.on(u, mn, line, ti.desc, null, null, callers);
+                                case MethodInsnNode mi -> hit.on(u, mn, line, mi.getOpcode(), mi.owner, mi.name, mi.desc, callers);
+                                case FieldInsnNode fi -> hit.on(u, mn, line, fi.getOpcode(), fi.owner, fi.name, fi.desc, callers);
+                                case org.objectweb.asm.tree.TypeInsnNode ti -> hit.on(u, mn, line, ti.getOpcode(), ti.desc, null, null, callers);
                                 case org.objectweb.asm.tree.LdcInsnNode ldc when ldc.cst instanceof org.objectweb.asm.Type ty
-                                        && ty.getSort() == org.objectweb.asm.Type.OBJECT -> hit.on(u, mn, line, ty.getInternalName(), null, null, callers);
+                                        && ty.getSort() == org.objectweb.asm.Type.OBJECT -> hit.on(u, mn, line, ldc.getOpcode(), ty.getInternalName(), null, null, callers);
                                 default -> { }
                             }
                         }

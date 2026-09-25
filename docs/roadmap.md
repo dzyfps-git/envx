@@ -13,7 +13,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
   (`bench/`).
 
-## Status: 1.1.0 (2026-09-25)
+## Status: 1.2.0 (2026-09-25)
 - 0.1–0.2: environment index, eight tools, `mod:` scoping, capped answers that name what they cut, measurement,
   an A/B switch for agents.
 - 0.3: history snapshots, `env import`, `env=<name>@<version>`, use-time auto-sync; empty results point to the past
@@ -33,6 +33,8 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - 1.1: a stable machine interface for other tools: `envx api`, JSON lines, versioned, read-only, batch lookups with
   portable identifiers (`docs/api.md`). On a server, nested client-only jars that the loader prints but does not
   load no longer count as loaded.
+- 1.2: `refs Class.member` finds a class's own uses and calls made through subclasses, picks the class that has the
+  member when several share a name, and marks field uses as reads or writes ("never read" answers need no grep).
 
 ## After 1.0
 - A baseline and indexing optimization study: compare envx's approach with other environment indexes on the same

@@ -108,6 +108,15 @@ class FixtureEnvTest {
     }
 
     @Test
+    void fieldUsesIncludeTheClassItselfAndSayReadOrWrite() { // study: agents grepped source for "who reads this field"
+        String out = call("refs", "target", "LivingEntity.persistent", tmp);
+        assertTrue(out.startsWith("uses of LivingEntity.persistent"), out);
+        assertTrue(out.contains("LivingEntity.isPersistent() -> boolean") || out.contains("LivingEntity.isPersistent()"), out);
+        assertTrue(out.contains("(read)"), out);
+        assertTrue(out.contains("1 read(s), 0 write(s)"), out);
+    }
+
+    @Test
     void namesResolveBothWays() {
         assertTrue(call("find", "query", "LivingEntity.tick", tmp).contains("class_1309.method_5773"));
         assertTrue(call("find", "query", "net.minecraft.class_1309.method_5773", tmp).contains("LivingEntity.tick"));

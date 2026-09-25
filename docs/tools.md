@@ -32,7 +32,7 @@ Answers show Yarn first and the runtime name in brackets.
 | `find` | `query`: a name, a wildcard (`*Tick*`) or, with `mod:`, a keyword (then also the mod's calls to other code named like it and its data files mentioning it; since 0.9.4) | `env` |
 | `outline` | `target`: a class, or `mod:<id>` | `filter` (members containing it, inherited ones too), `env` |
 | `source` | `target`: `Class.member`, `Class.a,b,c` or `Class` | `lines` (`a-b`), `env` |
-| `refs` | `target`: `Class.member` (call sites and overriders) or `Class` (who uses it) | `env` |
+| `refs` | `target`: `Class.member` (call sites and overriders; field uses marked read or write, with a count; calls through subclasses and the class's own uses included, since 1.2.0) or `Class` (who uses it) | `env` |
 | `mixins` | `target`: `Class`, `Class.method`, or `mod:<id>` | `includeAccessors`, `env` |
 | `check_mixins` | `project`: a mod project folder (default: working directory; needs a built jar) | `env` |
 | `grep` | `pattern`: a case-insensitive Java regex (in JSON files a match also shows its whole small object or array, lines marked `N-`; since 0.9.8) | `scope` (`config`, `resources`, `source`, `logs`; comma-separated), `path` (paths containing it), `env` |
