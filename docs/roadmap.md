@@ -32,9 +32,10 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   like-for-like pairs; CI green on Linux, Windows and macOS (`bench/README.md`).
 
 ## After 1.0
+- **Next (1.1):** a stable machine interface for other tools: `envx api`, JSON lines, versioned, read-only, batch
+  lookups with portable identifiers. Draft contract: `docs/api.md`.
 - A baseline and indexing optimization study: compare envx's approach with other environment indexes on the same
   questions (agent efficiency, context use, query speed, index size, decompilation strategy) and adopt what wins.
-- A stable machine interface for other tools (batch lookups with portable identifiers).
 - Adaptive, reusable knowledge: notes anchored to what they describe (a jar hash, an environment, a project) and
   reused while the anchor is unchanged, with indexed facts kept separate from AI-derived interpretation, which
   carries its evidence, provenance and verification state.
