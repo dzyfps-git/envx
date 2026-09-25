@@ -128,6 +128,7 @@ class TraceReportTest {
         assertTrue(report.contains("about: demo.jar, LivingMixin, LivingEntity") || report.contains("about: demo.jar"), report);
         assertTrue(report.contains("- grep -> reading jars: 1"), report); // shell work right after an empty envx answer
         assertTrue(report.contains("- empty answers: 1 (grep 1)"), report);
+        assertTrue(report.contains(": 1 commands in 1 session(s); no envx instructions: envx setup --project"), report); // the Claude session
         assertFalse(report.contains(System.getProperty("user.home")), "home folder shown as ~");
     }
 

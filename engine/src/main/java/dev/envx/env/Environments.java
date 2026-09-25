@@ -100,7 +100,7 @@ public final class Environments {
 
     private long ensureBase(Config.EnvDef def, Consumer<String> progress) throws IOException, SQLException {
         FabricBase base = FabricBase.forEnv(home, def.minecraft, def.mappings);
-        base.provision(Path.of(System.getProperty("user.home"), ".gradle"), progress);
+        base.provision(FabricBase.gradleHome(), progress);
         progress.accept("loading mappings " + base.id());
         indexer = new Indexer(db, home, base.loadMappings());
         String mcSha = hashLocal(base.intermediaryJar());
@@ -179,6 +179,7 @@ public final class Environments {
             Object[] last = lastSync(env);
             if (last != null && fingerprint.equals(last[1])) {
                 db.update("UPDATE snapshot SET checked_at=? WHERE id=?", now, last[0]);
+                packTexts((long) last[0]); // snapshots from before 1.4.3 have none
                 return new SyncResult((long) last[0], "no changes since snapshot " + last[0] + " of " + env
                         + (label != null ? " (" + label + ")" : "") + "; marked as checked\n", "");
             }
@@ -225,6 +226,7 @@ public final class Environments {
         summary.append(kind.equals("import") ? "imported" : "snapshot").append(' ').append(snap[0]).append(" of ").append(env)
                 .append(label != null ? " (" + label + ")" : "").append(": ").append(mods.size()).append(" jars, ")
                 .append(loadedCount).append(" loaded artifacts (incl. nested + minecraft), ").append(texts.size()).append(" text files\n");
+        packTexts(snap[0]);
         if (kind.equals("sync")) { // the current copies people browse; history lives in the DB and texts/
             refreshMirror(env, texts);
             writeLoaderList(env, loaded);
@@ -347,6 +349,22 @@ public final class Environments {
      * Reads the source's config/datapack text, redacts secrets and stores each distinct file once under
      * {@code texts/<sha>}. Files whose size and mtime are unchanged since a previous read are not read again.
      */
+    /** A snapshot's config and datapack texts in one file, for {@code grep scope=config} ({@link dev.envx.store.Packs}). */
+    public static Path textPack(Path home, long snapshotId) {
+        return home.resolve("texts").resolve("snapshot-" + snapshotId + ".pack");
+    }
+
+    private void packTexts(long snapshotId) throws IOException, SQLException {
+        Path pack = textPack(home, snapshotId);
+        if (Files.exists(pack)) return;
+        Map<String, Path> files = new java.util.TreeMap<>();
+        for (String[] r : db.query("SELECT rel_path, sha256 FROM snapshot_text WHERE snapshot_id=?",
+                rs -> new String[]{rs.getString(1), rs.getString(2)}, snapshotId)) {
+            files.put(r[0], home.resolve("texts").resolve(r[1].substring(0, 2)).resolve(r[1]));
+        }
+        if (!files.isEmpty()) dev.envx.store.Packs.write(pack, files);
+    }
+
     private Map<String, TextRef> storeTexts(EnvironmentSource source) throws IOException, SQLException {
         Map<String, TextRef> out = new TreeMap<>();
         List<EnvironmentSource.Entry> toRead = new ArrayList<>();

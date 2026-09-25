@@ -20,6 +20,15 @@ final class Status {
               envx help          every command
             """;
 
+    static final String GETTING_STARTED = """
+            Getting started (one time)
+              envx init                          Minecraft + Yarn base (from your Loom cache, else downloaded)
+              envx env add <name> <source>       your server: a folder, \\\\host\\share, or ssh://host/path (read-only)
+              envx env sync <name>               index its mods, configs and logs
+              envx link <mod project> <name>     optional: agents working in that project use this server
+              envx setup --claude --codex --path register with Claude Code and Codex, and put envx on your PATH
+            """;
+
     private Status() {}
 
     static int print(Config config) throws Exception {
@@ -32,7 +41,8 @@ final class Status {
         }
         System.out.println("Agents: " + agents);
         if (config.environments.isEmpty()) {
-            System.out.println("No environments yet: envx env add <name> <server folder | \\\\host\\share | ssh://host/path>");
+            System.out.println();
+            System.out.print(GETTING_STARTED);
         } else if (Files.exists(config.home().resolve("index.sqlite"))) {
             try (Db db = Db.open(config.home(), true)) {
                 for (String env : config.environments.keySet()) {

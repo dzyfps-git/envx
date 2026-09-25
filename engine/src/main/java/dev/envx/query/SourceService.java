@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
  * they are first remapped to Yarn once per jar (cached), then decompiled class by class.
  */
 public final class SourceService {
-    private static final String DECOMPILER = "vf1.12";
+    static final String DECOMPILER = "vf1.12";
 
     private final QueryService q;
     private final Path home;
@@ -339,8 +339,13 @@ public final class SourceService {
      * {@code Clearable.method_5448}, Yarn {@code clear}) cannot be remapped as is; it is remapped again with those
      * Minecraft members left under their runtime names.
      */
+    /** Where a mod jar's Yarn-named copy is kept; once its classes are all decompiled it is deleted (it can be remade). */
+    static Path remappedJar(Path home, String sha, FabricBase base) {
+        return home.resolve("remapped").resolve(sha.substring(0, 16) + "-" + base.id() + ".jar");
+    }
+
     static synchronized Path remapped(Path home, String sha, FabricBase base) throws IOException {
-        Path out = home.resolve("remapped").resolve(sha.substring(0, 16) + "-" + base.id() + ".jar");
+        Path out = remappedJar(home, sha, base);
         if (Files.exists(out)) return out;
         Path in = home.resolve("artifacts").resolve(sha.substring(0, 2)).resolve(sha + ".jar");
         Files.createDirectories(out.getParent());

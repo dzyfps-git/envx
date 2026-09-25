@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'dev.envx'
-version = '1.4.2'
+version = '1.4.3'
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }

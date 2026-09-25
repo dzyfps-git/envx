@@ -283,6 +283,9 @@ class FixtureEnvTest {
         log.reset();
         dev.envx.query.FullDecompile.decompilePending(config, "fx", new java.io.PrintStream(log, true));
         assertTrue(log.toString().contains("0 jar(s) to decompile"), log.toString()); // each jar once
+        try (var jars = Files.list(config.home().resolve("remapped"))) {
+            assertTrue(jars.noneMatch(j -> j.toString().endsWith(".jar")), "remapped jars are removed once their classes are all decompiled");
+        }
 
         // folders decompiled before packs existed (1.3.0/1.3.1) are packed, not decompiled again
         Path pack;

@@ -79,6 +79,21 @@ public final class FullDecompile {
         }
     }
 
+    /** Remapped mod jars whose classes are all decompiled: nothing reads them any more (143 MB for a large pack). */
+    static List<Path> unusedRemapped(Path home) {
+        Path root = home.resolve("remapped");
+        if (!Files.isDirectory(root)) return List.of();
+        try (var jars = Files.list(root)) {
+            return jars.filter(j -> j.getFileName().toString().endsWith(".jar")).filter(j -> {
+                String n = j.getFileName().toString();
+                Path dir = home.resolve("decomp").resolve(n.substring(0, n.length() - 4) + "-" + SourceService.DECOMPILER);
+                return Files.exists(dir.resolve(SourceService.COMPLETE)) && Files.exists(Packs.of(dir));
+            }).toList();
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
     /**
      * Starts a background decompile of {@code env} when something is left to do. Returns a line for the sync's
      * output, or null when nothing was started. Never throws: the decompile is a convenience.
@@ -89,6 +104,7 @@ public final class FullDecompile {
             int jars = 0;
             int classes = 0;
             int resources = unpackedResources(config.home()).size();
+            int unused = unusedRemapped(config.home()).size();
             try (Db db = Db.open(config.home(), true)) {
                 QueryService q = new QueryService(config, db);
                 Scope s = Scope.resolve(config, db, env, null);
@@ -99,7 +115,7 @@ public final class FullDecompile {
                     classes = jobs.stream().mapToInt(Job::classes).sum();
                 }
             }
-            if (jars == 0 && resources == 0) return null;
+            if (jars == 0 && resources == 0 && unused == 0) return null;
             List<String> cmd = new ArrayList<>(AutoSync.command(config, "decompile", env));
             // JVM options: a heap cap, and a CPU count the JVM sizes its own threads by
             cmd.addAll(1, List.of("-Xmx" + config.decompileMemoryMb + "m", "-XX:ActiveProcessorCount=" + Math.max(1, config.decompileThreads)));
@@ -107,8 +123,11 @@ public final class FullDecompile {
             Files.createDirectories(log.getParent());
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile())).start();
             p.getOutputStream().close();
-            String work = (jars > 0 ? "decompiling " + jars + " jar(s) (" + classes + " classes)" : "")
-                    + (jars > 0 && resources > 0 ? " and " : "") + (resources > 0 ? "packing " + resources + " resource folder(s)" : "");
+            List<String> parts = new ArrayList<>();
+            if (jars > 0) parts.add("decompiling " + jars + " jar(s) (" + classes + " classes)");
+            if (resources > 0) parts.add("packing " + resources + " resource folder(s)");
+            if (unused > 0) parts.add("removing " + unused + " remapped jar(s) no longer needed");
+            String work = String.join(", ", parts);
             return work + " in the background at idle priority, " + config.decompileThreads + " threads; progress in " + log
                     + "; stop with: envx stop";
         } catch (Exception e) {
@@ -151,11 +170,13 @@ public final class FullDecompile {
                     Path dir = SourceService.cacheDir(home, base, j.kind(), j.sha());
                     if (Files.exists(dir.resolve(SourceService.COMPLETE))) { // decompiled by 1.3.0/1.3.1, before packs
                         SourceService.packJava(dir);
+                        Files.deleteIfExists(SourceService.remappedJar(home, j.sha(), base));
                         done++;
                         continue;
                     }
                     int n = SourceService.decompileAll(SourceService.decompileInput(home, base, j.kind(), j.sha()),
                             SourceService.libraries(base, j.kind()), dir, Math.max(1, config.decompileThreads));
+                    if (!j.kind().equals("minecraft")) Files.deleteIfExists(SourceService.remappedJar(home, j.sha(), base)); // no longer read
                     done++;
                     log.printf(Locale.ROOT, "%s %d/%d %s: %d classes in %.1f s%n", Instant.now(), done, jobs.size(), j.label(), n, (System.nanoTime() - t) / 1e9);
                 } catch (Exception | OutOfMemoryError e) { // one bad jar must not stop the rest; it is retried next time
@@ -175,6 +196,17 @@ public final class FullDecompile {
             if (!resources.isEmpty()) {
                 log.printf(Locale.ROOT, "%s packed %d of %d resource folder(s) in %.0f s%n", Instant.now(), packed, resources.size(), (System.nanoTime() - t1) / 1e9);
             }
+            long freed = 0;
+            List<Path> unused = unusedRemapped(home);
+            for (Path j : unused) {
+                try {
+                    long size = Files.size(j);
+                    if (Files.deleteIfExists(j)) freed += size;
+                } catch (IOException e) {
+                    // in use (a source read remapping it right now): removed next time
+                }
+            }
+            if (!unused.isEmpty()) log.printf(Locale.ROOT, "%s removed %d remapped jar(s) no longer needed, %.0f MB%n", Instant.now(), unused.size(), freed / 1e6);
             return 0;
         } finally {
             Files.deleteIfExists(lockFile(home));

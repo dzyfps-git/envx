@@ -45,5 +45,6 @@ experiment; the machine interface (`envx api` v1) hides the internals, so none o
   (`.pack`, about 220 MB for the whole pack), which `grep scope=source` reads instead: 4 s cold, under 1 s warm. A
   search index is not needed at these sizes; revisit if the call log shows slow source searches. 1.4.1 packs each
   jar's extracted resources the same way (in the same background run after a sync, past versions included): a cold
-  `grep scope=resources` over 94,000 files went from 55 s to 1.6 s. The server's config texts (under 1,000 files)
-  are still read one by one.
+  `grep scope=resources` over 94,000 files went from 55 s to 1.6 s. 1.4.3 packs each snapshot's config texts
+  (cold config search 0.5 s) and removes a mod's remapped jar once all its classes are decompiled (nothing reads it
+  then; it is remade on demand if needed).

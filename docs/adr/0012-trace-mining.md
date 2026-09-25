@@ -24,7 +24,11 @@ help every mod, not one.
    index) and the two largest recent examples.
 5. **Sections:** shell work envx could have answered; shell work within three calls after an envx answer (the answer
    did not settle it); envx answers that cost a follow-up (empty, capped then asked again, errors, repeats); slow envx
-   calls from envx's own call log, with the version that answered; and the sessions with the most shell discovery.
+   calls from envx's own call log, with the version that answered; the sessions with the most shell discovery; and
+   the folders where agents did this work without calling envx, with whether the folder (or a parent) has envx's
+   instruction block and the `envx setup --project` line that adds it (since 1.4.3: agents mostly use envx where
+   AGENTS.md / CLAUDE.md tells them to). Work on other loaders (Forge, NeoForge) is counted as its own category: it is
+   demand for a platform envx does not cover, not a missed answer.
    Counts since envx was first used are shown separately, because earlier work could not have used it.
 6. **Privacy:** the report is printed locally. Commands are cut to one line, secret-looking values are redacted with
    the same filter as synced text, and the home folder is shown as `~`. Provenance is a pointer (tool, date, project

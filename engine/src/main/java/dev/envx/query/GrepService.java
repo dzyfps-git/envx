@@ -64,7 +64,9 @@ public final class GrepService {
             List<Object[]> files = q.db().query("SELECT rel_path, sha256 FROM snapshot_text WHERE snapshot_id=?",
                     rs -> new Object[]{rs.getString(1), home.resolve("texts").resolve(rs.getString(2).substring(0, 2)).resolve(rs.getString(2))},
                     s.snapshotId());
-            if (!files.isEmpty()) roots.add(new Root("server", null, modIds, files));
+            Path pack = dev.envx.env.Environments.textPack(home, s.snapshotId());
+            if (!files.isEmpty() && Files.exists(pack)) roots.add(new Root("server", null, modIds, null, pack));
+            else if (!files.isEmpty()) roots.add(new Root("server", null, modIds, files));
             else if (!s.historical()) roots.add(new Root("server", home.resolve("envs").resolve(s.env()).resolve("files"), modIds, null));
         }
         if (scopes.contains("resources")) {

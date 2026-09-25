@@ -182,7 +182,7 @@ public final class Main {
                 }
                 for (String[] b : bases.stream().map(Arrays::asList).distinct().map(l -> l.toArray(String[]::new)).toList()) {
                     var base = dev.envx.fabric.FabricBase.forEnv(config.home(), b[0], b[1]);
-                    base.provision(Path.of(System.getProperty("user.home"), ".gradle"), System.out::println);
+                    base.provision(dev.envx.fabric.FabricBase.gradleHome(), System.out::println);
                     System.out.println("base " + base.id() + ": ready (" + base.dir + ")");
                 }
                 if (config.environments.isEmpty()) {
@@ -198,6 +198,10 @@ public final class Main {
                 return AgentSetup.agents(config, rest);
             }
             case "stats" -> {
+                if (!Files.exists(config.home().resolve("index.sqlite"))) {
+                    System.out.println("home: " + config.home() + "\nno index yet: envx env sync <name> creates it");
+                    return 0;
+                }
                 try (Db db = Db.open(config.home(), true)) {
                     System.out.println("home: " + config.home());
                     long size = Files.size(config.home().resolve("index.sqlite"));

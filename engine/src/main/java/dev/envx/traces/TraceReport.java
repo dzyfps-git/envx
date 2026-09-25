@@ -39,10 +39,13 @@ public final class TraceReport {
     record Category(String name, Pattern pattern, String envxWay) {}
 
     static final List<Category> CATEGORIES = List.of(
+            // other loaders first: that work is demand for a platform envx does not cover yet, not a missed envx answer
+            new Category("Forge/NeoForge work", Pattern.compile("(?i)forge_gradle|minecraftforge|neoforge|mods\\.toml"), "not covered yet (envx is Fabric-only)"),
             new Category("decompiling", Pattern.compile("(?i)vineflower|fernflower|\\bcfr\\b|procyon|quiltflower|genSources|ilspy"), "source"),
             new Category("javap", Pattern.compile("(?i)\\bjavap\\b"), "outline / source"),
             new Category("mapping lookups", Pattern.compile("(?i)mappings\\.tiny|\\.tiny\\b|\\bclass_\\d{3,}|\\bmethod_\\d{3,}|\\bfield_\\d{3,}"), "find (any name form)"),
-            new Category("reading jars", Pattern.compile("(?i)Expand-Archive|ZipFile|System\\.IO\\.Compression|\\bjar\\s+-?[xt]v?f|\\bunzip\\b|7z\\s+[xel]\\b|zipfile"), "find / outline / grep scope=resources"),
+            // jars only: comparing a datapack .zip is the agent's own work
+            new Category("reading jars", Pattern.compile("(?is)^(?=.*\\.jar\\b).*(Expand-Archive|ZipFile|System\\.IO\\.Compression|\\bjar\\s+-?[xt]v?f|\\bunzip\\b|7z\\s+[xel]\\b|zipfile)"), "find / outline / grep scope=resources"),
             new Category("mixin configs", Pattern.compile("(?i)mixins?\\.json|refmap"), "mixins / check_mixins"),
             new Category("mod metadata", Pattern.compile("(?i)fabric\\.mod\\.json"), "find mod:<id> / env"),
             new Category("Gradle caches", Pattern.compile("(?i)\\.gradle[\\\\/]caches|loom-cache|fabric-loom"), "find / source"),
@@ -50,7 +53,8 @@ public final class TraceReport {
             // a project's test run (.\run\logs, ...\integration\x\logs) is the agent checking its own work, which envx does not index
             new Category("server logs", Pattern.compile("(?i)(?<![\\w.])(?:[A-Z]:|\\\\\\\\[\\w.-]+\\\\[\\w.$ -]+)[\\\\/]+(?:[^\\\\/'\"\\s]+[\\\\/]+)?"
                     + "(?:logs[\\\\/]+(?:latest|debug)\\.log|crash-reports)"), "env filter=errors / grep scope=logs"),
-            new Category("searching mod code", Pattern.compile("(?i)(\\brg\\b|\\bgrep\\b|Select-String|findstr).*(decomp|sources?[\\\\/]|[\\\\/]mods[\\\\/]|\\.jar\\b|remapped)"), "grep scope=source / refs"),
+            // a search whose target is decompiled or sources code; searching the project's own src/ is not rediscovery
+            new Category("searching mod code", Pattern.compile("(?i)(\\brg\\b|\\bgrep\\b|Select-String|findstr)[^|;\\n]*(decomp|genSources|-sources\\b|remapped)"), "grep scope=source / refs"),
             new Category("listing mods", Pattern.compile("(?i)(Get-ChildItem|\\bls\\b|\\bdir\\b|\\bfind\\b)[^|;]*[\\\\/]mods\\b"), "env"));
 
     private static final Pattern JAR = Pattern.compile("([A-Za-z][A-Za-z0-9_+.-]*?)(?:[-_](?:mc)?\\d[\\w.+-]*)?\\.jar\\b");
@@ -126,6 +130,7 @@ public final class TraceReport {
         envxAnswers(out, ss);
         slowCalls(out);
         investigations(out, ss);
+        folders(out, ss);
         return out.toString();
     }
 
@@ -296,6 +301,49 @@ public final class TraceReport {
         costs.stream().sorted(Comparator.comparingLong(Cost::chars).reversed()).limit(5).forEach(c -> out.append(String.format(Locale.ROOT,
                 "- %s: %d discovery commands, ~%s tokens, envx calls %d%s%n", where(c.s(), null), c.n(), k(c.chars() / 4),
                 c.s().calls().stream().filter(Traces.Call::envx).count(), c.anchors().isEmpty() ? "" : "; about " + String.join(", ", c.anchors()))));
+    }
+
+    /**
+     * Folders where agents did this work without calling envx at all, since envx was first used, and whether the folder
+     * has envx's instruction block: agents mostly use envx where AGENTS.md / CLAUDE.md tells them to.
+     */
+    private void folders(StringBuilder out, List<Traces.Session> ss) {
+        out.append("\n## 6. Folders where agents did this work without envx\n");
+        Map<String, long[]> by = new LinkedHashMap<>(); // folder -> {sessions, discovery commands}
+        for (Traces.Session s : ss) {
+            if (s.cwd() == null || s.calls().stream().anyMatch(Traces.Call::envx)) continue;
+            long n = s.calls().stream().filter(c -> c.shell() && (firstEnvx == null || sinceEnvx(c))).map(c -> classify(c.text()))
+                    .filter(c -> c != null && !c.name().startsWith("Forge")).count();
+            if (n == 0) continue;
+            long[] v = by.computeIfAbsent(s.cwd(), k -> new long[2]);
+            v[0]++;
+            v[1] += n;
+        }
+        if (by.isEmpty()) {
+            out.append("None.\n");
+            return;
+        }
+        by.entrySet().stream().sorted(Comparator.comparingLong((Map.Entry<String, long[]> e) -> e.getValue()[1]).reversed()).limit(8).forEach(e -> {
+            boolean block = hasInstructions(Path.of(e.getKey()));
+            out.append("- ").append(clip(e.getKey(), 100)).append(": ").append(e.getValue()[1]).append(" commands in ").append(e.getValue()[0])
+                    .append(" session(s); ").append(block ? "has envx instructions" : "no envx instructions: envx setup --project \"" + clip(e.getKey(), 100) + "\"")
+                    .append('\n');
+        });
+    }
+
+    /** True if the folder or a parent has envx's instruction block in AGENTS.md or CLAUDE.md. */
+    static boolean hasInstructions(Path dir) {
+        for (Path d = dir; d != null; d = d.getParent()) {
+            for (String name : List.of("AGENTS.md", "CLAUDE.md")) {
+                Path f = d.resolve(name);
+                try {
+                    if (Files.isRegularFile(f) && Files.readString(f).contains("envx:begin")) return true;
+                } catch (IOException | RuntimeException e) {
+                    // unreadable: keep looking
+                }
+            }
+        }
+        return false;
     }
 
     // ------------------------------------------------------------------ anchors and formatting

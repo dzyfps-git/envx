@@ -181,8 +181,13 @@ final class AgentSetup {
     static String summary(Config config) throws IOException {
         Boolean codexOn = codexEnabled();
         boolean claudeOn = claudeRegistered();
-        boolean blocks = !blockFiles(config, loadState(config)).isEmpty();
-        if (Boolean.TRUE.equals(codexOn) && claudeOn && blocks) return "ON for Codex and Claude Code";
+        State state = loadState(config);
+        boolean blocks = !blockFiles(config, state).isEmpty();
+        boolean expectBlocks = !instructionTargets(config, state).isEmpty(); // none before a project is linked
+        if (codexOn == null && !claudeOn && !blocks) return "not set up yet: envx setup --claude --codex (or just one of them)";
+        if (Boolean.TRUE.equals(codexOn) && claudeOn && (blocks || !expectBlocks)) {
+            return "ON for Codex and Claude Code" + (expectBlocks ? "" : "; no mod project linked yet (envx link <dir> <env> tells agents there to use envx)");
+        }
         if (!Boolean.TRUE.equals(codexOn) && !claudeOn && !blocks) return "OFF (clean baseline)";
         return "MIXED: Codex " + (Boolean.TRUE.equals(codexOn) ? "on" : "off") + ", Claude Code " + (claudeOn ? "on" : "off")
                 + ", instruction blocks " + (blocks ? "present" : "none") + " (envx on | envx off fixes it)";

@@ -6,23 +6,26 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
- * One file holding all text files of a folder that never changes (a decompiled jar, a jar's extracted resources),
- * for {@code grep}. On a spinning disk, reading tens of thousands of small files from cold took 21 s (decompiled code)
- * and 55 s (resources), nearly all of it seeks; one file per folder is read in one sweep (ADR 0011).
+ * One file holding many text files that never change (a decompiled jar, a jar's extracted resources, a snapshot's
+ * config texts), for {@code grep}. On a spinning disk, reading tens of thousands of small files from cold took 21 s
+ * (decompiled code) and 55 s (resources), nearly all of it seeks; one file is read in one sweep (ADR 0011).
  *
- * <p>Format: each file starts with a line {@link #ENTRY}{@code <path relative to the folder>}, followed by its text.
- * Files that are not UTF-8 are left out, exactly as grep skips them when reading the folder.
+ * <p>Format: each file starts with a line {@link #ENTRY}{@code <path as answers show it>}, followed by its text.
+ * Files that are not UTF-8 are left out, exactly as grep skips them when reading them one by one.
  */
 public final class Packs {
-    /** The pack's file name inside its folder (dot files are never searched themselves). */
+    /** A folder's pack file name inside it (dot files are never searched themselves). */
     public static final String NAME = ".pack";
     public static final char ENTRY = '\u0001';
 
@@ -37,34 +40,40 @@ public final class Packs {
      * false, writing nothing, when a file's text contains the entry marker at a line start (it could not be read back).
      */
     public static boolean write(Path dir, Predicate<Path> include) throws IOException {
-        List<Path> files;
+        Map<String, Path> files = new TreeMap<>();
         try (Stream<Path> walk = Files.walk(dir)) {
-            files = walk.filter(Files::isRegularFile).filter(f -> {
+            walk.filter(Files::isRegularFile).filter(f -> {
                 String n = f.getFileName().toString();
                 return !n.startsWith(".") && !n.endsWith(".tmp");
-            }).filter(include).sorted().toList();
+            }).filter(include).forEach(f -> files.put(dir.relativize(f).toString().replace('\\', '/'), f));
         }
-        Path tmp = dir.resolve(NAME + "." + ProcessHandle.current().pid() + ".tmp");
+        return write(of(dir), files);
+    }
+
+    /** Writes a pack at {@code target} from {path as answers show it -> stored file}, in the map's order. */
+    public static boolean write(Path target, Map<String, Path> files) throws IOException {
+        Files.createDirectories(target.getParent());
+        Path tmp = target.resolveSibling(target.getFileName() + "." + ProcessHandle.current().pid() + ".tmp");
         try (var out = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
-            for (Path f : files) {
+            for (var e : files.entrySet()) {
                 String text;
                 try {
                     text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                            .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(Files.readAllBytes(f))).toString();
-                } catch (CharacterCodingException e) {
-                    continue; // binary: grep skips it too
+                            .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(Files.readAllBytes(e.getValue()))).toString();
+                } catch (CharacterCodingException | NoSuchFileException ex) {
+                    continue; // binary (grep skips it too) or gone
                 }
                 if (text.indexOf(ENTRY) >= 0 && (text.charAt(0) == ENTRY || text.contains("\n" + ENTRY) || text.contains("\r" + ENTRY))) {
                     out.close();
                     Files.deleteIfExists(tmp);
                     return false;
                 }
-                out.write(ENTRY + dir.relativize(f).toString().replace('\\', '/') + "\n");
+                out.write(ENTRY + e.getKey() + "\n");
                 out.write(text);
                 if (!text.isEmpty() && !text.endsWith("\n") && !text.endsWith("\r")) out.write("\n");
             }
         }
-        Files.move(tmp, of(dir), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         return true;
     }
 

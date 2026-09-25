@@ -72,6 +72,12 @@ public final class FabricBase {
     }
 
     /** Makes the base available: from the Loom cache if it has it, else downloaded. */
+    /** Gradle's user home, where Loom keeps its cache: {@code GRADLE_USER_HOME}, else {@code ~/.gradle}. */
+    public static Path gradleHome() {
+        String g = System.getenv("GRADLE_USER_HOME");
+        return g != null && !g.isBlank() ? Path.of(g) : Path.of(System.getProperty("user.home"), ".gradle");
+    }
+
     public void provision(Path gradleHome, java.util.function.Consumer<String> progress) throws IOException {
         if (isProvisioned()) return;
         try {

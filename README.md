@@ -35,9 +35,11 @@ engine/build/install/envx/bin/envx init              # Minecraft + Yarn base (Lo
 envx env add myserver /path/to/server                # or \\host\share, or ssh://host/path (read-only)
 envx env sync myserver                               # index its mods, configs and logs
 envx link /path/to/my-mod myserver                   # queries from that project use this environment
-envx setup --claude --codex                          # install; register the MCP server with Claude Code and Codex
-envx setup --path                                    # optional: put `envx` on your PATH (Windows: user PATH)
+envx setup --claude --codex --path                   # install; register with Claude Code and Codex; put `envx` on PATH
 ```
+After that, `envx` in a new terminal shows the status and the everyday commands. After the first sync, envx
+decompiles every loaded jar once in the background (idle priority, 2 threads, about 10 minutes for a 600-jar pack;
+`decompileAll` in `config.json` turns it off), so code search covers everything.
 Data lives in `~/.envx`. To keep it elsewhere, set `ENVX_HOME` or put the path on one line in `~/.envx/location`.
 
 ## Everyday
