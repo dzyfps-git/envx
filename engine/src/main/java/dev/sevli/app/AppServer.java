@@ -75,6 +75,9 @@ public final class AppServer {
                 case "cancel" -> ok(id, cancel(str(req, "target")));
                 case "agents" -> ok(id, Agents.state(config));
                 case "review" -> background(id, this::review); // the maintainer's install only (ADR 0014)
+                case "clean.preview" -> background(id, () -> cleanPreview(req)); // optional cleanup (ADR 0014)
+                case "clean.free" -> install(id, str(req, "ids"), "clean", "--yes", "--no-check", "--free"); // after the app's confirmation
+                case "remove" -> install(id, str(req, "env"), "remove", "--yes"); // after the app's confirmation
                 case "agents.activity" -> background(id, () -> Agents.activity(config));
                 default -> fail(id, "unknown_op", "unknown op '" + op + "'");
             }
@@ -172,6 +175,20 @@ public final class AppServer {
         o.addProperty("backgroundRunning", FullDecompile.isRunning(config.home()));
         o.addProperty("owner", config.indexesEverything()); // shows the Review screen
         return o;
+    }
+
+    /** What can be freed, with sizes and whether each part can be rebuilt; frees nothing. */
+    private JsonElement cleanPreview(JsonObject req) {
+        List<String> snapshots = new ArrayList<>();
+        if (req.has("snapshots")) req.getAsJsonArray("snapshots").forEach(e -> snapshots.add(e.getAsString()));
+        boolean check = !req.has("check") || req.get("check").getAsBoolean();
+        try (Db db = Db.open(config.home(), true)) {
+            JsonObject o = new JsonObject();
+            o.add("items", GSON.toJsonTree(new dev.sevli.store.Cleanup(config, db).preview(snapshots, check)));
+            return o;
+        } catch (Exception e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
     }
 
     /** What the maintainer's install runs that the public supported list does not cover as it is. */

@@ -42,6 +42,8 @@ public final class Main {
               sevli list                       your servers and linked projects
               sevli accept <name>              index the jars on a server that became supported (Sevli never does it unasked)
               sevli logs <name> on|off         copy the server's recent logs and crash reports (on by default)
+              sevli remove <name>              stop following a server (its history stays; the server is never touched)
+              sevli clean [<name>@<label>]     free space: shows what can go and what can be rebuilt, then asks
               sevli history <name>             its versions; sevli diff <name> [<from> [<to>]] shows what changed
               sevli insights [--days 30]       what agents worked out by hand that Sevli could have answered
 
@@ -167,6 +169,12 @@ public final class Main {
                 System.out.println(rest.get(0) + ": server logs and crash reports " + (def.logs
                         ? "are copied again from the next check" : "are no longer copied (the copies already made stay until they age out)"));
                 return 0;
+            }
+            case "clean" -> {
+                return CleanCommand.clean(config, rest);
+            }
+            case "remove" -> {
+                return CleanCommand.remove(config, rest);
             }
             case "review" -> { // the maintainer's install: what is indexed here but not publicly supported yet
                 try (Db db = Db.open(config.home(), true)) {

@@ -86,6 +86,22 @@ export interface ReviewResult {
   }[];
 }
 
+export type Recovery = "rebuildable" | "not_verified" | "unrecoverable";
+
+/** op "clean.preview": what may be freed (nothing is freed until op "clean.free" with chosen ids, after the user confirms). */
+export interface CleanItem {
+  id: string;
+  kind: "history" | "leftovers";
+  label: string;
+  bytes: number;
+  why: string;
+  recovery: Recovery;
+  note: string;
+  /** Freeing it loses points in history (a warning is shown before confirming). */
+  historyLoss: boolean;
+  jars: { artifactId: number; sha256: string; name: string; bytes: number; recovery: Recovery; note: string }[];
+}
+
 export type AgentId = "claude" | "codex";
 
 /** op "agents": each coding agent as its own settings describe it (sign-in files are never read). */
