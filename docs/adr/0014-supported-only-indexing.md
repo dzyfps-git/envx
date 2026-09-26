@@ -17,7 +17,7 @@ published pack. The maintainer's own install must index everything, to test new 
    maintainer's tools.
 2. **The gate is in the sync.** Every jar on a server is hashed (read-only; unchanged jars by the size/mtime cache).
    Only jars the environment's accepted list supports are stored and indexed; the rest are recorded in
-   `snapshot_unindexed` (schema v3) with id, version and reason, and count in the snapshot's identity. Nested jars
+   `snapshot_unindexed` (an added table) with id, version and reason, and count in the snapshot's identity. Nested jars
    belong to the jar that bundles them; the baseline and the user's own project builds (`project:`) are exempt.
 3. **Nothing unapproved is indexed automatically.** Connecting a server accepts the list of that moment
    (`supportAccepted`). Automatic syncs keep running for servers the user added, but jars a newer list adds wait for
@@ -46,6 +46,7 @@ published pack. The maintainer's own install must index everything, to test new 
 
 ## Consequences
 - A public install indexes nothing from a server until a signed list is published; the baseline itself still works.
-- The index schema is v3; older Sevli versions refuse it, so the upgrade ships with the version that uses it.
+- The new table is an addition, not a new schema version: agent sessions still running an older release keep reading
+  the index after an upgrade.
 - Display names are still stored once per jar. When a second baseline arrives, names move to a per-baseline table
   (the same jar under two mappings); decompiled source and remapped jars are already keyed by jar and baseline.

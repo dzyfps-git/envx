@@ -328,7 +328,7 @@ public final class Environments {
 
     public static Coverage coverage(Db db, long snapshotId) throws SQLException {
         int indexed = db.queryInt("SELECT count(*) FROM snapshot_file WHERE snapshot_id=?", snapshotId);
-        // read-only processes do not upgrade the index; before v3 nothing was left unindexed
+        // read-only processes do not add tables; an index no 2.1 sync has written to has nothing unindexed
         if (db.queryInt("SELECT count(*) FROM sqlite_master WHERE name='snapshot_unindexed'") == 0) return new Coverage(indexed, List.of());
         List<Unindexed> rows = db.query("SELECT rel_path, sha256, size, mod_id, version, reason FROM snapshot_unindexed WHERE snapshot_id=? ORDER BY rel_path",
                 rs -> new Unindexed(rs.getString(1), rs.getString(2), rs.getLong(3), rs.getString(4), rs.getString(5), rs.getString(6)), snapshotId);

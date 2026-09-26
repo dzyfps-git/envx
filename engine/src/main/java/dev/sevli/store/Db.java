@@ -21,7 +21,7 @@ import java.util.List;
 public final class Db implements AutoCloseable {
     /** Bump when the index content changes shape; artifacts with an older version are re-indexed. */
     public static final int INDEX_VERSION = 1;
-    private static final int SCHEMA_VERSION = 3;
+    private static final int SCHEMA_VERSION = 2;
 
     private final Connection conn;
 
@@ -94,6 +94,7 @@ public final class Db implements AutoCloseable {
     }
 
     private void migrate() throws SQLException {
+        additions();
         int v = queryInt("PRAGMA user_version");
         if (v >= SCHEMA_VERSION) return;
         try (Statement s = conn.createStatement()) {
@@ -207,7 +208,17 @@ public final class Db implements AutoCloseable {
                 }
             }
             s.executeUpdate("CREATE INDEX IF NOT EXISTS snapshot_label ON snapshot(env, label)");
-            // v3: supported-only indexing (ADR 0014). Jars on a server that were hashed but not indexed, and why.
+            s.executeUpdate("PRAGMA user_version=" + SCHEMA_VERSION);
+        }
+    }
+
+    /**
+     * Additive changes: new tables that older versions simply do not read. They do not raise the schema version, so an
+     * agent session still running the previous release keeps answering from the same index after an upgrade.
+     */
+    private void additions() throws SQLException {
+        try (Statement s = conn.createStatement()) {
+            // 2.1: supported-only indexing (ADR 0014). Jars on a server that were hashed but not indexed, and why.
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS snapshot_unindexed(
                   snapshot_id INTEGER NOT NULL REFERENCES snapshot(id) ON DELETE CASCADE,
@@ -215,7 +226,6 @@ public final class Db implements AutoCloseable {
                   mod_id TEXT, version TEXT,
                   reason TEXT NOT NULL,          -- not_supported | newly_supported | revoked
                   PRIMARY KEY(snapshot_id, rel_path)) WITHOUT ROWID""");
-            s.executeUpdate("PRAGMA user_version=" + SCHEMA_VERSION);
         }
     }
 

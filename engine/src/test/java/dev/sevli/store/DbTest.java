@@ -28,8 +28,8 @@ class DbTest {
                 "INSERT INTO snapshot(env, taken_at, source) VALUES('fx', '2026-01-01T00:00:00Z', 'folder')",
                 "PRAGMA user_version=1");
         try (Db db = Db.open(home, false)) {
-            assertEquals(3, db.queryInt("PRAGMA user_version"));
-            assertEquals(0, db.queryInt("SELECT count(*) FROM snapshot_unindexed"), "v3 adds the not-indexed jars table");
+            assertEquals(2, db.queryInt("PRAGMA user_version"), "additions do not raise the version: older sessions keep reading");
+            assertEquals(0, db.queryInt("SELECT count(*) FROM snapshot_unindexed"), "2.1 adds the not-indexed jars table");
             assertEquals("sync", db.queryString("SELECT kind FROM snapshot WHERE env='fx'")); // old rows are live syncs
             assertEquals(1, db.queryInt("SELECT count(*) FROM pragma_table_info('snapshot') WHERE name='label'"));
         }
