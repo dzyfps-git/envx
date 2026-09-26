@@ -185,6 +185,7 @@ public final class Api {
         Scope scope = Scope.of(config, db, env, id);
         Set<Long> loaded = new HashSet<>(db.query(scope.artifactSet(), rs -> rs.getLong(1)));
         Set<Long> all = new HashSet<>(db.query("SELECT artifact_id FROM snapshot_artifact WHERE snapshot_id=?", rs -> rs.getLong(1), id));
+        all.removeAll(scope.hidden()); // not publicly supported (ADR 0014)
         s = new Snap(id, env, def, kind, current != null && current == id, loaded, all);
         snaps.put(id, s);
         return s;

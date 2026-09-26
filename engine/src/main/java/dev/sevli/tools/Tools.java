@@ -145,7 +145,8 @@ public final class Tools {
                 }
             }
             // history and project builds are never mistaken for the current server
-            return new Result(scope.banner() + t.handler().run(ctx, scope, args), false);
+            String text = t.handler().run(ctx, scope, args);
+            return new Result(scope.banner() + text + gapNote(name, scope, text), false);
         } catch (IllegalArgumentException e) {
             String msg = e.getMessage();
             var gone = java.util.regex.Pattern.compile("No loaded mod matches 'mod:([^']+)'").matcher(msg == null ? "" : msg);
@@ -154,6 +155,20 @@ public final class Tools {
         } catch (Exception e) {
             return new Result("sevli error: " + e, true);
         }
+    }
+
+    /** Tools whose answers are complete lists (callers, injections, matches): their absence and counts need the gap note. */
+    private static final Set<String> COMPLETENESS = Set.of("refs", "mixins", "check_mixins", "grep");
+
+    /**
+     * While jars on the server are not indexed (ADR 0014), an answer that says "none" or counts something says
+     * which jars it could not look into. Nothing is added when every jar is indexed, or for a mod: selection.
+     */
+    static String gapNote(String tool, Scope scope, String text) {
+        if (scope.gap() == null || scope.scoped()) return "";
+        boolean absence = text.startsWith("No ") || text.startsWith("Nothing ");
+        if (!COMPLETENESS.contains(tool) && !absence) return "";
+        return (text.endsWith("\n") ? "" : "\n") + scope.gap().note() + "\n";
     }
 
     public record Result(String text, boolean error) {}

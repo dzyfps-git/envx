@@ -166,6 +166,64 @@ class SupportGateTest {
         }
     }
 
+    private static String call(dev.sevli.tools.Tools.Ctx ctx, String tool, String key, String value, String env) {
+        com.google.gson.JsonObject a = new com.google.gson.JsonObject();
+        if (key != null) a.addProperty(key, value);
+        a.addProperty("env", env);
+        dev.sevli.tools.Tools.Result r = dev.sevli.tools.Tools.call(ctx, tool, a, Path.of("."));
+        assertFalse(r.error(), r.text());
+        return r.text();
+    }
+
+    @Test
+    void jarsIndexedBeforeTheRuleAreHiddenNowAndInHistory() throws Exception {
+        Config config = config("mine", server("server", demo, other));
+        config.supportPolicy = "all"; // an index built before supported-only indexing (or on the maintainer's install)
+        config.save();
+        try (Db db = Db.open(config.home(), false)) {
+            Environments envs = new Environments(config, db);
+            envs.sync("mine", m -> {});
+            envs.importFolder("mine", server("backup", other), "0.9", m -> {}); // a past version with only the other mod
+        }
+        publish(1, new Object[]{demo, 1, "active"});
+        config.supportPolicy = null;
+        config.environments.get("mine").supportAccepted = 1;
+        config.save();
+        Supported.fetch(config);
+        try (Db db = Db.open(config.home(), true)) {
+            var ctx = new dev.sevli.tools.Tools.Ctx(config, db, null);
+            String refs = call(ctx, "refs", "target", "LivingEntity.tick", "mine");
+            assertTrue(refs.contains("dev.demo.Ticker") && !refs.contains("dev.other"), refs);
+            assertTrue(refs.contains("[in indexed jars only: 1 of 2 jars on this server are not indexed (not publicly supported) and may also use or change this: other 2.0.0]"), refs);
+            String mixins = call(ctx, "mixins", "target", "LivingEntity", "mine");
+            assertTrue(mixins.contains("LivingMixin") && !mixins.contains("TickMixin"), mixins);
+            String past = call(ctx, "refs", "target", "LivingEntity.tick", "mine@0.9");
+            assertFalse(past.contains("dev.other"), "history is filtered too: " + past);
+            String find = call(ctx, "find", "query", "dev.other.Ticker", "mine");
+            assertFalse(find.contains("dev.other.Ticker ("), find);
+            String env = call(ctx, "env", null, null, "mine");
+            assertTrue(env.contains("1 of 2 jars indexed; not indexed (not publicly supported): other 2.0.0"), env);
+            assertTrue(indexed(db, other), "hidden, not deleted");
+        }
+        publish(2, new Object[]{demo, 1, "revoked"});
+        Supported.fetch(config);
+        try (Db db = Db.open(config.home(), true)) {
+            String refs = call(new dev.sevli.tools.Tools.Ctx(config, db, null), "refs", "target", "LivingEntity.tick", "mine");
+            assertFalse(refs.contains("dev.demo"), "a revoked jar disappears from answers: " + refs);
+        }
+    }
+
+    @Test
+    void fullCoverageAddsNoNote() throws Exception {
+        publish(1, new Object[]{demo, 1, "active"});
+        Config config = config("mine", server("server", demo));
+        try (Db db = Db.open(config.home(), false)) {
+            new Environments(config, db).sync("mine", m -> {});
+            String refs = call(new dev.sevli.tools.Tools.Ctx(config, db, null), "refs", "target", "LivingEntity.tick", "mine");
+            assertFalse(refs.contains("not indexed"), refs);
+        }
+    }
+
     @Test
     void theMaintainersInstallIndexesEverything() throws Exception {
         Config config = config("mine", server("server", demo, other));

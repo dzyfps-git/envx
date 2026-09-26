@@ -18,7 +18,28 @@ import java.util.stream.Collectors;
  * {@code refs ServerTickEvents mod:openpartiesandclaims} finds Fabric's class but lists only OPAC's users.
  */
 public record Scope(String env, long snapshotId, String takenAt, String source, boolean loaderList, Config.EnvDef def,
-                    Set<Long> only, String onlyLabel, String at, Overlay overlay) {
+                    Set<Long> only, String onlyLabel, String at, Overlay overlay, Set<Long> hidden, Gap gap) {
+
+    /**
+     * Jars on the server in this snapshot that queries cannot look into (not publicly supported, ADR 0014):
+     * {@code missing} of {@code total}, with names such as "a-mod 1.2". Null in a scope when every jar is indexed.
+     */
+    public record Gap(int missing, int total, List<String> names) {
+        private String some() {
+            return String.join(", ", names.subList(0, Math.min(3, names.size()))) + (names.size() > 3 ? ", ..." : "");
+        }
+
+        /** For answers that say "none" or count something. */
+        public String note() {
+            return "[in indexed jars only: " + missing + " of " + total + " jars on this server are not indexed (not publicly supported)"
+                    + " and may also use or change this: " + some() + "]";
+        }
+
+        /** For the environment summary. */
+        public String summary() {
+            return (total - missing) + " of " + total + " jars indexed; not indexed (not publicly supported): " + some();
+        }
+    }
 
     /**
      * {@code project:}: the project's built jar ({@code added}: it and its nested jars) used in place of the deployed
@@ -35,6 +56,17 @@ public record Scope(String env, long snapshotId, String takenAt, String source, 
 
     public static void pinCurrentSnapshot() {
         pinCurrent = true;
+    }
+
+    /** This scope with supported-only visibility applied (ADR 0014): unsupported jars hidden, and the note for gaps. */
+    private Scope supported(Config config, Db db) throws SQLException {
+        Visibility.Env v = Visibility.of(config, db, env);
+        return new Scope(env, snapshotId, takenAt, source, loaderList, def, only, onlyLabel, at, overlay, v.hidden(), Visibility.gap(db, snapshotId, v));
+    }
+
+    /** SQL condition: {@code <alias>.<column>} is not a jar hidden by supported-only indexing; "1=1" when none is. */
+    public String visible(String column) {
+        return hidden.isEmpty() ? "1=1" : column + " NOT IN (" + ids(hidden) + ")";
     }
 
     /** True for a past snapshot asked for with {@code env@label}; answers then say so. */
@@ -60,6 +92,7 @@ public record Scope(String env, long snapshotId, String takenAt, String source, 
         if (def == null || !"client".equals(def.side)) {
             loaded += " AND artifact_id NOT IN (SELECT id FROM artifact WHERE " + CLIENT_ONLY_SQL.replace("{a}", "artifact") + ")";
         }
+        if (!hidden.isEmpty()) loaded += " AND " + visible("artifact_id");
         if (overlay == null) return loaded;
         return loaded + (overlay.replaced().isEmpty() ? "" : " AND artifact_id NOT IN (" + ids(overlay.replaced()) + ")")
                 + " UNION SELECT id FROM artifact WHERE id IN (" + ids(overlay.added()) + ")";
@@ -84,11 +117,11 @@ public record Scope(String env, long snapshotId, String takenAt, String source, 
     }
 
     public Scope restrict(Set<Long> ids, String label) {
-        return new Scope(env, snapshotId, takenAt, source, loaderList, def, ids, label, at, overlay);
+        return new Scope(env, snapshotId, takenAt, source, loaderList, def, ids, label, at, overlay, hidden, gap);
     }
 
     public Scope withOverlay(Overlay o) {
-        return new Scope(env, snapshotId, takenAt, source, loaderList, def, only, onlyLabel, at, o);
+        return new Scope(env, snapshotId, takenAt, source, loaderList, def, only, onlyLabel, at, o, hidden, gap);
     }
 
     /** First line of an answer that is not plain current-server truth (a past snapshot, a project build), else "". */
@@ -108,10 +141,10 @@ public record Scope(String env, long snapshotId, String takenAt, String source, 
         Long current = db.queryLong("SELECT id FROM snapshot WHERE env=? ORDER BY kind='sync' DESC, id DESC LIMIT 1", env);
         var rows = db.query("SELECT taken_at, source, loader_list, label FROM snapshot WHERE id=? AND env=?",
                 rs -> new Scope(env, snapshotId, rs.getString(1), rs.getString(2), rs.getInt(3) == 1, def, null, null,
-                        current != null && current == snapshotId ? null : rs.getString(4) != null ? rs.getString(4) : "#" + snapshotId, null),
+                        current != null && current == snapshotId ? null : rs.getString(4) != null ? rs.getString(4) : "#" + snapshotId, null, Set.of(), null),
                 snapshotId, env);
         if (rows.isEmpty()) throw new IllegalArgumentException("No snapshot " + snapshotId + " of " + env);
-        return rows.getFirst();
+        return rows.getFirst().supported(config, db);
     }
 
     /**
@@ -137,20 +170,21 @@ public record Scope(String env, long snapshotId, String takenAt, String source, 
         if (at != null) {
             String label = at;
             var rows = db.query(cols + "AND label=? ORDER BY id DESC LIMIT 1",
-                    rs -> new Scope(env, rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4) == 1, def, null, null, label, null), env, label);
+                    rs -> new Scope(env, rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4) == 1, def, null, null, label, null, Set.of(), null), env, label);
             if (rows.isEmpty()) {
                 List<String> known = db.query("SELECT label FROM snapshot WHERE env=? AND label IS NOT NULL GROUP BY label ORDER BY min(id)",
                         rs -> rs.getString(1), env);
                 throw new IllegalArgumentException("No snapshot of " + env + " labeled '" + label + "'. Known: " + known);
             }
-            return rows.getFirst();
+            return rows.getFirst().supported(config, db);
         }
         Scope pinned = pinCurrent ? PINNED.get(env) : null;
         if (pinned != null) return pinned;
         var rows = db.query(cols + "ORDER BY kind='sync' DESC, id DESC LIMIT 1",
-                rs -> new Scope(env, rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4) == 1, def, null, null, null, null), env);
+                rs -> new Scope(env, rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4) == 1, def, null, null, null, null, Set.of(), null), env);
         if (rows.isEmpty()) throw new IllegalArgumentException("Environment '" + env + "' was never synced. Run `sevli sync " + env + "`.");
-        if (pinCurrent) PINNED.put(env, rows.getFirst());
-        return rows.getFirst();
+        Scope scope = rows.getFirst().supported(config, db);
+        if (pinCurrent) PINNED.put(env, scope);
+        return scope;
     }
 }

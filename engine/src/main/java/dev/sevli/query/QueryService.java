@@ -531,6 +531,8 @@ public final class QueryService {
                 FROM snapshot_artifact sa JOIN artifact a ON a.id=sa.artifact_id
                 WHERE sa.snapshot_id=? AND a.mod_id IS NOT NULL
                   AND (lower(a.mod_id) LIKE ? OR lower(coalesce(a.mod_name,'')) LIKE ? OR lower(a.file_name) LIKE ?)
+                  AND """ + " " + s.visible("a.id") + """
+
                 ORDER BY a.mod_id""",
                 rs -> new Object[]{rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getInt(7), rs.getInt(8)},
                 s.snapshotId(), f, f, f);
@@ -636,6 +638,7 @@ public final class QueryService {
         out.line("snapshot " + s.snapshotId() + " taken " + s.takenAt() + " (" + age(s.takenAt()) + ")"
                 + (checked != null && !checked.equals(s.takenAt()) ? ", last checked " + age(checked) : "") + " from " + s.source());
         out.line(jars + " jars in mods/, " + loaded + " loaded mods incl. nested" + (s.loaderList() ? " (resolved via loader log)" : " (no loader log; nested versions unverified)"));
+        if (s.gap() != null) out.line(s.gap().summary());
         if (!s.historical()) {
             String err = db.meta("autosync." + s.env() + ".error");
             if (err != null) out.line("auto-sync: " + err + "; answers use the snapshot above");

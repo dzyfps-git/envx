@@ -37,7 +37,8 @@ final class PastHint {
         if (s.historical()) return out;
         for (Object[] r : q.db().query("""
                 SELECT sa.artifact_id, sn.label FROM snapshot_artifact sa JOIN snapshot sn ON sn.id=sa.snapshot_id
-                WHERE sn.env=? AND sn.label IS NOT NULL AND sn.id<>? AND sa.loaded=1
+                WHERE sn.env=? AND sn.label IS NOT NULL AND sn.id<>? AND sa.loaded=1 AND """ + " " + s.visible("sa.artifact_id") + """
+
                   AND NOT EXISTS (SELECT 1 FROM snapshot_artifact c WHERE c.snapshot_id=? AND c.artifact_id=sa.artifact_id AND c.loaded=1)
                 ORDER BY sn.id""", rs -> new Object[]{rs.getLong(1), rs.getString(2)}, s.env(), s.snapshotId(), s.snapshotId())) {
             out.computeIfAbsent((Long) r[0], k -> new LinkedHashSet<>()).add((String) r[1]);
