@@ -76,7 +76,12 @@ final class Status {
         Object[] r = rows.getFirst();
         String when = ago((String) r[1]);
         String auto = config.autoSyncHours > 0 ? "auto-sync when older than " + trim(config.autoSyncHours) + " h" : "auto-sync off";
-        return "checked " + when + ", snapshot " + r[0] + (r[2] != null ? " (" + r[2] + ")" : "") + ", " + r[3] + " mod jars loaded; " + auto;
+        var cov = dev.sevli.env.Environments.coverage(db, (long) r[0]);
+        String coverage = cov.unindexed().isEmpty() ? "" : "\n  " + cov.indexed() + " of " + cov.total() + " jars indexed ("
+                + (cov.count("not_supported") > 0 ? cov.count("not_supported") + " not supported yet" : "")
+                + (cov.count("newly_supported") > 0 ? (cov.count("not_supported") > 0 ? ", " : "") + cov.count("newly_supported") + " newly supported: sevli accept " + env : "")
+                + (cov.count("revoked") > 0 ? (cov.count("not_supported") + cov.count("newly_supported") > 0 ? ", " : "") + cov.count("revoked") + " withdrawn" : "") + ")";
+        return "checked " + when + ", snapshot " + r[0] + (r[2] != null ? " (" + r[2] + ")" : "") + ", " + r[3] + " mod jars loaded; " + auto + coverage;
     }
 
     static String ago(String iso) {

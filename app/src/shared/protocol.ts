@@ -46,7 +46,20 @@ export interface Environment {
   label?: string;
   sourceJarsDone?: number;
   sourceJarsTotal?: number;
+  /** Supported-only indexing (ADR 0014): jars indexed out of all jars on the server. */
+  jarsIndexed?: number;
+  jarsTotal?: number;
+  /** Jars a newer supported list covers; indexed only after op "accept" (the user's click). */
+  newlySupported?: number;
+  unindexed?: UnindexedJar[];
   syncRunning: boolean;
+}
+
+export interface UnindexedJar {
+  file: string;
+  modId?: string | null;
+  version?: string | null;
+  reason: "not_supported" | "newly_supported" | "revoked";
 }
 
 export interface Status {

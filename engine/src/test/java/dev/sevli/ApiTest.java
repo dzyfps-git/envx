@@ -59,6 +59,7 @@ class ApiTest {
                 """);
 
         config = Config.load();
+        config.supportPolicy = "all"; // the whole pipeline; supported-only indexing is tested in SupportGateTest
         Config.EnvDef def = new Config.EnvDef();
         def.sources.add(server.toString());
         config.environments.put("fx", def);

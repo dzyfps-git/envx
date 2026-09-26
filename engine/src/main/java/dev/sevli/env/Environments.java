@@ -52,6 +52,44 @@ public final class Environments {
 
     public record SyncResult(long snapshotId, String summary, String diff) {}
 
+    /** A jar on the server that was hashed but not indexed (ADR 0014). */
+    public record Unindexed(String relPath, String sha256, long size, String modId, String version, String reason) {
+        public String label() {
+            String name = modId != null ? modId + (version != null ? " " + version : "") : relPath.substring(relPath.lastIndexOf('/') + 1);
+            return reason.equals("revoked") ? name + " (withdrawn)" : name;
+        }
+    }
+
+    /**
+     * Which jars a sync of {@code env} may index: the supported list the user accepted for it, plus jars it already
+     * indexed before (a retired version keeps working). Null when everything is indexed (the maintainer's install).
+     */
+    private record Gate(dev.sevli.catalog.Supported list, int accepted, Set<String> usedBefore) {
+        boolean allows(String sha) {
+            return list.acceptable(sha, accepted, usedBefore.contains(sha));
+        }
+
+        String reason(String sha) {
+            var j = list.get(sha);
+            if (j != null && j.revoked()) return "revoked";
+            return list.newlySupported(sha, accepted) ? "newly_supported" : "not_supported";
+        }
+    }
+
+    private Gate gate(String env) throws SQLException, IOException {
+        if (config.indexesEverything()) return null;
+        Config.EnvDef def = def(env);
+        dev.sevli.catalog.Supported list = dev.sevli.catalog.Supported.current(config, false);
+        if (def.supportAccepted == null) { // connecting a server accepts the supported list of that moment
+            def.supportAccepted = list.catalogVersion;
+            config.save();
+        }
+        Set<String> used = new HashSet<>(db.query("""
+                SELECT DISTINCT f.sha256 FROM snapshot_file f JOIN snapshot s ON s.id=f.snapshot_id WHERE s.env=?""",
+                rs -> rs.getString(1), env));
+        return new Gate(list, def.supportAccepted, used);
+    }
+
     /** A config/datapack text file as stored: redacted, then kept by hash under {@code texts/}. */
     private record TextRef(String sha256, long size) {}
 
@@ -117,12 +155,19 @@ public final class Environments {
             throws IOException, SQLException {
         progress.accept("listing mods at " + source.describe());
         List<EnvironmentSource.Entry> mods = source.listMods();
+        Gate gate = gate(env);
         List<Indexer.Job> jobs = new ArrayList<>();
         Map<Path, EnvironmentSource.Entry> byLocal = new HashMap<>();
         List<EnvironmentSource.Entry> fetch = new ArrayList<>();
+        List<Unindexed> unindexed = new ArrayList<>();
+        List<EnvironmentSource.Entry> unindexedUnread = new ArrayList<>(); // hash known, id and version not yet
         for (EnvironmentSource.Entry e : mods) {
             String sha = e.sha256() != null ? e.sha256() : cachedHash(source.describe() + "|" + e.relPath(), e);
-            if (sha != null && Files.exists(indexer.artifactPath(sha))) {
+            if (sha != null && gate != null && !gate.allows(sha)) { // hashed only: neither stored nor indexed
+                String[] known = knownMod(sha);
+                if (known != null) unindexed.add(new Unindexed(e.relPath(), sha, e.size(), known[0], known[1], gate.reason(sha)));
+                else unindexedUnread.add(withSha(e, sha));
+            } else if (sha != null && Files.exists(indexer.artifactPath(sha))) {
                 Path local = indexer.artifactPath(sha);
                 jobs.add(new Indexer.Job(local, sha, "mod"));
                 byLocal.put(local, withSha(e, sha));
@@ -131,6 +176,7 @@ public final class Environments {
             }
         }
         progress.accept(mods.size() + " jars, " + fetch.size() + " new or changed to fetch");
+        fetch.addAll(unindexedUnread); // read in memory for their id and version only
         for (int i = 0; i < fetch.size(); i += 16) {
             List<EnvironmentSource.Entry> batch = fetch.subList(i, Math.min(fetch.size(), i + 16));
             Map<String, byte[]> data = source.readMany(batch.stream().map(EnvironmentSource.Entry::relPath).toList());
@@ -141,6 +187,12 @@ public final class Environments {
                     continue;
                 }
                 String sha = JarParser.sha256(bytes);
+                if (gate != null && !gate.allows(sha)) {
+                    rememberHash(source.describe() + "|" + e.relPath(), e, sha);
+                    String[] idv = JarParser.modIdVersion(bytes);
+                    unindexed.add(new Unindexed(e.relPath(), sha, e.size(), idv[0], idv[1], gate.reason(sha)));
+                    continue;
+                }
                 Path local = indexer.artifactPath(sha);
                 writeAtomically(local, bytes); // a killed background sync must never leave a truncated jar under its hash
                 rememberHash(source.describe() + "|" + e.relPath(), e, sha);
@@ -171,6 +223,7 @@ public final class Environments {
         // Same jars, same text, same loaded list = same snapshot. Identity is by content, not by time.
         List<String> fp = new ArrayList<>();
         results.forEach((p, r) -> fp.add("jar " + byLocal.get(p).relPath() + " " + r.sha256()));
+        unindexed.forEach(u -> fp.add("unindexed " + u.relPath() + " " + u.sha256() + " " + u.reason()));
         texts.forEach((rel, t) -> fp.add("text " + rel + " " + t.sha256()));
         loaded.forEach(m -> fp.add("loaded " + m.id() + " " + m.version() + (m.nested() ? " nested" : "")));
         Collections.sort(fp);
@@ -210,6 +263,10 @@ public final class Environments {
                 db.update("INSERT OR REPLACE INTO snapshot_file(snapshot_id, rel_path, sha256, size) VALUES(?,?,?,?)",
                         snap[0], e.relPath(), r.getValue().sha256(), e.size());
             }
+            for (Unindexed u : unindexed) {
+                db.update("INSERT OR REPLACE INTO snapshot_unindexed(snapshot_id, rel_path, sha256, size, mod_id, version, reason) VALUES(?,?,?,?,?,?,?)",
+                        snap[0], u.relPath(), u.sha256(), u.size(), u.modId(), u.version(), u.reason());
+            }
             for (var t : texts.entrySet()) {
                 db.update("INSERT OR REPLACE INTO snapshot_text(snapshot_id, rel_path, sha256, size) VALUES(?,?,?,?)",
                         snap[0], t.getKey(), t.getValue().sha256(), t.getValue().size());
@@ -229,6 +286,7 @@ public final class Environments {
         summary.append(kind.equals("import") ? "imported" : "snapshot").append(' ').append(snap[0]).append(" of ").append(env)
                 .append(label != null ? " (" + label + ")" : "").append(": ").append(mods.size()).append(" jars, ")
                 .append(loadedCount).append(" loaded artifacts (incl. nested + minecraft), ").append(texts.size()).append(" text files\n");
+        if (!unindexed.isEmpty()) summary.append(coverage(env, mods.size(), unindexed));
         packTexts(snap[0]);
         if (kind.equals("sync")) { // the current copies people browse; history lives in the DB and texts/
             refreshMirror(env, texts);
@@ -255,6 +313,49 @@ public final class Environments {
         Files.createDirectories(home.resolve("envs").resolve(env));
         if (kind.equals("sync")) Files.write(home.resolve("envs").resolve(env).resolve("warnings.txt"), warnings);
         return new SyncResult(snap[0], summary.toString(), diff);
+    }
+
+    /** How much of a snapshot's server is indexed: its indexed jars, and the jars that were only hashed. */
+    public record Coverage(int indexed, List<Unindexed> unindexed) {
+        public int total() {
+            return indexed + unindexed.size();
+        }
+
+        public long count(String reason) {
+            return unindexed.stream().filter(u -> u.reason().equals(reason)).count();
+        }
+    }
+
+    public static Coverage coverage(Db db, long snapshotId) throws SQLException {
+        int indexed = db.queryInt("SELECT count(*) FROM snapshot_file WHERE snapshot_id=?", snapshotId);
+        // read-only processes do not upgrade the index; before v3 nothing was left unindexed
+        if (db.queryInt("SELECT count(*) FROM sqlite_master WHERE name='snapshot_unindexed'") == 0) return new Coverage(indexed, List.of());
+        List<Unindexed> rows = db.query("SELECT rel_path, sha256, size, mod_id, version, reason FROM snapshot_unindexed WHERE snapshot_id=? ORDER BY rel_path",
+                rs -> new Unindexed(rs.getString(1), rs.getString(2), rs.getLong(3), rs.getString(4), rs.getString(5), rs.getString(6)), snapshotId);
+        return new Coverage(indexed, rows);
+    }
+
+    /** "480 of 500 jars indexed" and what the rest are, for a sync's summary. */
+    static String coverage(String env, int total, List<Unindexed> unindexed) {
+        StringBuilder sb = new StringBuilder().append(total - unindexed.size()).append(" of ").append(total).append(" jars indexed");
+        for (String reason : List.of("not_supported", "newly_supported", "revoked")) {
+            List<String> names = unindexed.stream().filter(u -> u.reason().equals(reason)).map(Unindexed::label).sorted().toList();
+            if (names.isEmpty()) continue;
+            sb.append("; ").append(names.size()).append(switch (reason) {
+                case "not_supported" -> " not supported yet";
+                case "newly_supported" -> " newly supported (sevli accept " + env + " indexes them)";
+                default -> " withdrawn from support";
+            }).append(": ").append(String.join(", ", names.subList(0, Math.min(8, names.size())))).append(names.size() > 8 ? ", ..." : "");
+        }
+        return sb.append('\n').toString();
+    }
+
+    /** {id, version} of a jar known from an earlier snapshot (indexed or not), without reading it again; else null. */
+    private String[] knownMod(String sha) throws SQLException {
+        var rows = db.query("SELECT mod_id, version FROM snapshot_unindexed WHERE sha256=? LIMIT 1", rs -> new String[]{rs.getString(1), rs.getString(2)}, sha);
+        if (!rows.isEmpty()) return rows.getFirst();
+        rows = db.query("SELECT mod_id, mod_version FROM artifact WHERE sha256=?", rs -> new String[]{rs.getString(1), rs.getString(2)}, sha);
+        return rows.isEmpty() ? null : rows.getFirst();
     }
 
     private record LoaderSource(List<LoaderLog.LoadedMod> mods, long mtime, String file) {}

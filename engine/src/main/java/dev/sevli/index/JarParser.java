@@ -211,6 +211,20 @@ public final class JarParser {
         return in.readAllBytes();
     }
 
+    /** {id, version} from a jar's fabric.mod.json, read in memory (nothing is stored); nulls when absent. */
+    public static String[] modIdVersion(byte[] jar) {
+        try (var zin = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(jar))) {
+            for (var e = zin.getNextEntry(); e != null; e = zin.getNextEntry()) {
+                if (!e.getName().equals("fabric.mod.json")) continue;
+                JsonObject j = com.google.gson.JsonParser.parseString(new String(zin.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                return new String[]{str(j, "id"), str(j, "version")};
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // not a readable jar: shown by its file name
+        }
+        return new String[]{null, null};
+    }
+
     public static String sha256(byte[] data) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));

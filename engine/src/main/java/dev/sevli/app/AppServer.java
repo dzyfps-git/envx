@@ -70,7 +70,8 @@ public final class AppServer {
                 case "catalog" -> ok(id, catalog());
                 case "home.get" -> ok(id, home());
                 case "home.set" -> ok(id, setHome(str(req, "dir")));
-                case "install" -> install(id, str(req, "target"));
+                case "install" -> install(id, str(req, "target"), "catalog", "install");
+                case "accept" -> install(id, str(req, "env"), "accept"); // the user's click on "N jars are now supported"
                 case "cancel" -> ok(id, cancel(str(req, "target")));
                 case "agents" -> ok(id, Agents.state(config));
                 case "agents.activity" -> background(id, () -> Agents.activity(config));
@@ -143,6 +144,20 @@ public final class AppServer {
                         env.addProperty("snapshot", (long) rows.getFirst()[0]);
                         env.addProperty("checkedAt", (String) rows.getFirst()[1]);
                         env.addProperty("label", (String) rows.getFirst()[2]);
+                        var cov = dev.sevli.env.Environments.coverage(db, (long) rows.getFirst()[0]);
+                        env.addProperty("jarsIndexed", cov.indexed());
+                        env.addProperty("jarsTotal", cov.total());
+                        env.addProperty("newlySupported", cov.count("newly_supported"));
+                        JsonArray un = new JsonArray();
+                        for (var u : cov.unindexed().subList(0, Math.min(200, cov.unindexed().size()))) {
+                            JsonObject j = new JsonObject();
+                            j.addProperty("file", u.relPath().substring(u.relPath().lastIndexOf('/') + 1));
+                            j.addProperty("modId", u.modId());
+                            j.addProperty("version", u.version());
+                            j.addProperty("reason", u.reason());
+                            un.add(j);
+                        }
+                        env.add("unindexed", un);
                         int[] c = FullDecompile.progress(config, e.getKey());
                         env.addProperty("sourceJarsDone", c[0]);
                         env.addProperty("sourceJarsTotal", c[1]);
@@ -206,11 +221,16 @@ public final class AppServer {
         return a;
     }
 
-    /** Runs {@code sevli catalog install <target>} as its own process, forwarding its output as progress events. */
-    private void install(JsonElement id, String target) throws IOException {
+    /**
+     * Runs a writing command ({@code sevli catalog install <target>}, {@code sevli accept <env>}) as its own process,
+     * forwarding its output as progress events.
+     */
+    private void install(JsonElement id, String target, String... command) throws IOException {
         if (target == null || target.isBlank()) throw new IllegalArgumentException("target is required");
         if (running.containsKey(target)) throw new IllegalStateException(target + " is already being installed");
-        List<String> cmd = new ArrayList<>(AutoSync.command(config, "catalog", "install", target));
+        List<String> args = new ArrayList<>(List.of(command));
+        args.add(target);
+        List<String> cmd = new ArrayList<>(AutoSync.command(config, args.toArray(String[]::new)));
         Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
         p.getOutputStream().close();
         running.put(target, p);

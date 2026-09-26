@@ -40,6 +40,7 @@ public final class Main {
 
             Servers
               sevli list                       your servers and linked projects
+              sevli accept <name>              index the jars on a server that became supported (Sevli never does it unasked)
               sevli history <name>             its versions; sevli diff <name> [<from> [<to>]] shows what changed
               sevli insights [--days 30]       what agents worked out by hand that Sevli could have answered
 
@@ -146,6 +147,24 @@ public final class Main {
                 List<String> sub = new ArrayList<>(List.of(cmd));
                 sub.addAll(rest);
                 return env(config, sub);
+            }
+            case "accept" -> { // index the jars a newer supported list added for this server (the user's click)
+                String env = rest.isEmpty() ? config.envFor(Path.of("").toAbsolutePath()) : rest.getFirst();
+                if (env == null || !config.environments.containsKey(env)) throw new IllegalArgumentException("usage: sevli accept <name> (sevli list shows them)");
+                dev.sevli.catalog.Supported list = dev.sevli.catalog.Supported.current(config, true);
+                config.environments.get(env).supportAccepted = list.catalogVersion;
+                config.save();
+                System.out.println(env + ": accepted supported list " + list.catalogVersion);
+                return sync(config, env, false);
+            }
+            case "owner" -> { // the maintainer's own install indexes every jar to test it before publishing (ADR 0014); not in help
+                need(rest, 1, "sevli owner on|off");
+                config.supportPolicy = rest.getFirst().equals("on") ? "all" : null;
+                config.save();
+                System.out.println(config.indexesEverything()
+                        ? "owner mode: every jar is indexed from the next sync on, published or not (nothing is published by this)"
+                        : "owner mode off: only publicly supported jars are indexed from the next sync on");
+                return 0;
             }
             case "info" -> {
                 return query(config, "env", rest);

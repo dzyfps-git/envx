@@ -44,6 +44,16 @@ public final class Config {
     /** The published catalog of supported baselines and modpacks (recipes only; ADR 0013). */
     public String catalogUrl = "https://raw.githubusercontent.com/dzyfps-git/sevli-catalog/main/index.json";
     public List<String> denyRoots = List.of(); // machine-specific: listed in the data home's config.json
+    /**
+     * Which jars of an environment are indexed (ADR 0014). Unset: only jars the published catalog supports
+     * ({@code catalog/Supported}); the rest are listed as not indexed. {@code "all"}: every jar, for the
+     * maintainer's own install, where new jars are tested before they are published (not offered in the app).
+     */
+    public String supportPolicy;
+
+    public boolean indexesEverything() {
+        return "all".equals(supportPolicy);
+    }
 
     public static final class EnvDef {
         /**
@@ -58,6 +68,11 @@ public final class Config {
         public String platform = "fabric";
         /** server or client: which side's mixins can apply here. Client-only mixins are hidden on servers. */
         public String side = "server";
+        /**
+         * The supported-list version the user accepted for this environment (set when it is first synced, raised by
+         * {@code sevli accept}). Jars that only a newer list supports wait for that click; nothing is indexed unasked.
+         */
+        public Integer supportAccepted;
 
         public boolean hides(String mixinSide) {
             return mixinSide != null && !mixinSide.equals("common") && side != null && !mixinSide.equals(side);

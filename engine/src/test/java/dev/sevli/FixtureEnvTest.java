@@ -75,6 +75,7 @@ class FixtureEnvTest {
         Files.write(project.resolve("build/libs/demo-1.1.0.jar"), Fixture.mod("demo", "1.1.0", "dev/demo/mixin/LivingMixin", "demo$onTick"));
 
         config = Config.load();
+        config.supportPolicy = "all"; // the whole pipeline; supported-only indexing is tested in SupportGateTest
         Config.EnvDef def = new Config.EnvDef();
         def.sources.add(server.toString());
         config.environments.put("fx", def);
