@@ -63,7 +63,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   `on`/`off`, `setup`, `link`, `insights`, `info`, `check` (`sevli help advanced` for the rest); the forms from before
   2.0 and the `envx` command keep working through 2.x.
 
-## Next: supported-only indexing
+## Next: supported-only indexing (ADR 0014; engine part done, ships as 2.1)
 The public app indexes only what the maintainer has published as supported: exact jar versions (sha256) from
 published packs, listed in a signed, generated `supported.json` in the catalog. An own server needs a supported
 baseline, not a published pack; its other jars stay unindexed and are shown as coverage ("480 of 500 jars indexed"),

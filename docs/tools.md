@@ -14,6 +14,14 @@ Any of these resolve to the same class or member:
 
 Answers show Yarn first and the runtime name in brackets.
 
+## Coverage (ADR 0014)
+A public install indexes only publicly supported jars; jars indexed before that rule, or revoked since, are hidden in
+current and past snapshots alike. While jars on the server are not indexed, `refs`, `mixins`, `check_mixins`, `grep`
+and every answer starting with "No ..." end with one line such as
+`[in indexed jars only: 20 of 500 jars on this server are not indexed (not publicly supported) and may also use or
+change this: a-mod 1.2, b-mod 3.0, c-mod 1.0, ...]`, and `env` shows "480 of 500 jars indexed". With full coverage
+(and on the maintainer's install) answers are unchanged.
+
 ## Qualifiers (in the main argument of find, outline, source, refs, mixins, grep)
 | Qualifier | Meaning |
 |---|---|

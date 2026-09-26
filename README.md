@@ -15,8 +15,12 @@ questions describe a private server and are not published; the harness is in `be
 - A supported baseline, when you install it: Minecraft 1.20.1 with intermediary runtime names plus Yarn
   1.20.1+build.10, downloaded from Mojang and the Fabric maven (hash-checked) and merged and remapped locally.
   Nothing is downloaded until you choose it (ADR 0013).
-- Every jar in the server's `mods/` folder, including jar-in-jar. Each jar is indexed once, keyed by its content hash.
-  Only mods that the server's `latest.log` shows as loaded count as active.
+- The jars in the server's `mods/` folder that are publicly supported: exact versions (by content hash) from the
+  published packs, listed in a signed catalog file. Other jars are hashed, never stored or indexed, and shown as
+  coverage ("480 of 500 jars indexed"); answers such as "no callers" say which jars they could not look into. Jars
+  that become supported later are indexed only when you accept them (`sevli accept`; ADR 0014). Each jar, with its
+  jar-in-jar, is indexed once, keyed by its content hash. Only mods that the server's `latest.log` shows as loaded
+  count as active.
 - Classes, members, inheritance, class-level references, `fabric.mod.json`, and mixins (configs + refmaps).
 - Mod data files (recipes, tags, functions, ...) and the server's config/datapack text, with secrets redacted.
 - Sources are decompiled with Vineflower and cached: on demand for a class, and every loaded jar in a background
@@ -34,8 +38,7 @@ cd engine
 ```
 engine/build/install/sevli/bin/sevli add fabric-1.20.1   # the baseline: Minecraft 1.20.1 + Yarn (~75 MB)
 sevli connect myserver /path/to/server                # or \\host\share, or ssh://host/path (read-only)
-sevli sync myserver                               # index its mods, configs and logs
-sevli link /path/to/my-mod myserver                   # queries from that project use this environment
+sevli link /path/to/my-mod myserver                   # queries from that project use this server
 sevli setup                   # install; register with Claude Code and Codex; put `sevli` on PATH
 ```
 After that, `sevli` in a new terminal shows the status and the everyday commands. After the first sync, Sevli
@@ -45,12 +48,14 @@ Data lives in `~/.sevli`. To keep it elsewhere, set `SEVLI_HOME` or put the path
 
 ## Everyday
 ```
-sevli                                      # status: agents on/off, how fresh each environment is, background work
-sevli on | off                             # switch sevli on/off for Codex and Claude Code (new sessions)
+sevli                                      # status: agents on/off, how fresh each server is, background work
+sevli on | off                             # switch Sevli on/off for Codex and Claude Code (new sessions)
 sevli sync                                 # pull the default environment's mods and configs now
 sevli stop                                 # stop the background decompile (the next sync continues it)
-sevli insights                               # what agents still rediscovered by hand, from their session files (ADR 0012)
-sevli help                                 # every command
+sevli accept myserver                      # index jars that became publicly supported (never done unasked)
+sevli insights                             # what agents still rediscovered by hand, from their session files (ADR 0012)
+sevli clean                                # free space: previews what can go and what can be rebuilt, then asks
+sevli help                                 # every command (sevli help advanced for the rest)
 ```
 
 ## Use
@@ -65,8 +70,10 @@ sevli source ServerChunkManager.tick,tickChunks
 sevli outline MobEntity --filter despawn   # includes inherited members
 sevli refs "ServerTickEvents mod:openpartiesandclaims"
 sevli check /path/to/my-mod
-sevli setup               # install this version; keeps each tool's on/off state
-sevli on|off|status                 # switch sevli for Codex + Claude Code + AGENTS.md/CLAUDE.md
+sevli setup                            # install this version; keeps each agent's on/off state
+sevli on | off                         # switch Sevli for Codex + Claude Code + AGENTS.md/CLAUDE.md
+sevli agents                           # each part of that switch in detail
+sevli remove myserver                  # stop following a server; its history stays, the server is never touched
 
 sevli import myserver /path/to/backup       # add a past version from a server folder (label from config/bcc.json)
 sevli history myserver                      # snapshots, labels, which one is current
