@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Supported-only indexing (ADR 0014): a public install indexes only jars the signed catalog list supports. */
@@ -242,6 +243,34 @@ class SupportGateTest {
             String refs = call(new dev.sevli.tools.Tools.Ctx(config, db, null), "refs", "target", "LivingEntity.tick", "mine");
             assertFalse(refs.contains("not indexed"), refs);
         }
+    }
+
+    @Test
+    void reviewShowsWhatTheMaintainerRunsThatIsNotPublishedYet() throws Exception {
+        publish(1, new Object[]{demo, 1, "active"});
+        byte[] demoNext = Fixture.mod("demo", "1.1.0", "dev/demo/mixin/LivingMixin", "demo$onTick");
+        Config config = config("mine", server("server", demoNext, other));
+        config.supportPolicy = "all";
+        config.save();
+        try (Db db = Db.open(config.home(), false)) {
+            new Environments(config, db).sync("mine", m -> {});
+            var items = dev.sevli.catalog.Review.items(config, db, Supported.fetch(config));
+            assertEquals(List.of("demo 1.1.0 new_version (published 1.0.0)", "other 2.0.0 new_mod (published null)"),
+                    items.stream().map(i -> i.modId() + " " + i.version() + " " + i.kind() + " (published " + i.publishedVersions() + ")").sorted().toList());
+        }
+    }
+
+    @Test
+    void keysMadeBySevliSignListsItAccepts() throws Exception {
+        String[] pair = Supported.newKeyPair();
+        byte[] data = "{\"schema\":1,\"catalogVersion\":1,\"jars\":{}}".getBytes(StandardCharsets.UTF_8);
+        System.setProperty("sevli.catalogKey", pair[0]);
+        Files.write(catalog.resolve("supported.json"), data);
+        Files.writeString(catalog.resolve("supported.json.sig"), Supported.sign(data, pair[1]));
+        Config config = config("mine", server("server", demo));
+        assertEquals(1, Supported.fetch(config).catalogVersion);
+        System.setProperty("sevli.catalogKey", Supported.newKeyPair()[0]); // someone else's key
+        assertThrows(java.io.IOException.class, () -> Supported.fetch(config));
     }
 
     @Test

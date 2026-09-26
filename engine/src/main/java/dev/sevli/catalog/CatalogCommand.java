@@ -19,6 +19,33 @@ public final class CatalogCommand {
                 if (args.size() < 2) throw new IllegalArgumentException("usage: sevli add <id>   (ids: sevli browse)");
                 return install(config, args.get(1), out);
             }
+            case "keygen" -> { // the maintainer, once: the key pair that signs the supported list
+                if (args.size() < 2) throw new IllegalArgumentException("usage: sevli catalog keygen <folder outside every repository>");
+                java.nio.file.Path key = java.nio.file.Path.of(args.get(1)).toAbsolutePath().resolve("sevli-catalog-signing.key");
+                if (java.nio.file.Files.exists(key)) throw new IllegalArgumentException(key + " already exists; a new key would invalidate every published signature");
+                String[] pair;
+                try {
+                    pair = Supported.newKeyPair();
+                } catch (java.security.GeneralSecurityException e) {
+                    throw new IOException(e);
+                }
+                java.nio.file.Files.createDirectories(key.getParent());
+                java.nio.file.Files.writeString(key, pair[1] + System.lineSeparator());
+                out.println("private key: " + key + "\n  keep it secret and out of every repository; the catalog's signing workflow needs it as a secret");
+                out.println("public key (goes into Sevli's code, Supported.PUBLIC_KEY):\n  " + pair[0]);
+            }
+            case "sign" -> { // the maintainer: <file>.sig next to a generated supported.json
+                int k = args.indexOf("--key");
+                if (args.size() < 2 || k < 0 || k + 1 >= args.size()) throw new IllegalArgumentException("usage: sevli catalog sign <supported.json> --key <key file>");
+                java.nio.file.Path file = java.nio.file.Path.of(args.get(1));
+                try {
+                    String sig = Supported.sign(java.nio.file.Files.readAllBytes(file), java.nio.file.Files.readString(java.nio.file.Path.of(args.get(k + 1))));
+                    java.nio.file.Files.writeString(file.resolveSibling(file.getFileName() + ".sig"), sig + "\n");
+                } catch (java.security.GeneralSecurityException | IllegalArgumentException e) {
+                    throw new IOException("could not sign with that key: " + e.getMessage(), e);
+                }
+                out.println("signed " + file + " -> " + file.getFileName() + ".sig");
+            }
             default -> throw new IllegalArgumentException("usage: sevli browse, or sevli add <id>");
         }
         return 0;

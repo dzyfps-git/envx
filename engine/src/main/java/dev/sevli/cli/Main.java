@@ -168,6 +168,11 @@ public final class Main {
                         ? "are copied again from the next check" : "are no longer copied (the copies already made stay until they age out)"));
                 return 0;
             }
+            case "review" -> { // the maintainer's install: what is indexed here but not publicly supported yet
+                try (Db db = Db.open(config.home(), true)) {
+                    return dev.sevli.catalog.Review.run(config, db, System.out);
+                }
+            }
             case "owner" -> { // the maintainer's own install indexes every jar to test it before publishing (ADR 0014); not in help
                 need(rest, 1, "sevli owner on|off");
                 config.supportPolicy = rest.getFirst().equals("on") ? "all" : null;

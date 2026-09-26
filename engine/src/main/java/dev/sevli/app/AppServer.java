@@ -74,6 +74,7 @@ public final class AppServer {
                 case "accept" -> install(id, str(req, "env"), "accept"); // the user's click on "N jars are now supported"
                 case "cancel" -> ok(id, cancel(str(req, "target")));
                 case "agents" -> ok(id, Agents.state(config));
+                case "review" -> background(id, this::review); // the maintainer's install only (ADR 0014)
                 case "agents.activity" -> background(id, () -> Agents.activity(config));
                 default -> fail(id, "unknown_op", "unknown op '" + op + "'");
             }
@@ -169,7 +170,22 @@ public final class AppServer {
         }
         o.add("environments", envs);
         o.addProperty("backgroundRunning", FullDecompile.isRunning(config.home()));
+        o.addProperty("owner", config.indexesEverything()); // shows the Review screen
         return o;
+    }
+
+    /** What the maintainer's install runs that the public supported list does not cover as it is. */
+    private JsonElement review() {
+        if (!config.indexesEverything()) throw new IllegalStateException("review is only for the maintainer's install");
+        try (Db db = Db.open(config.home(), true)) {
+            dev.sevli.catalog.Supported list = dev.sevli.catalog.Supported.current(config, true);
+            JsonObject o = new JsonObject();
+            o.addProperty("catalogVersion", list == dev.sevli.catalog.Supported.NONE ? null : list.catalogVersion);
+            o.add("items", GSON.toJsonTree(dev.sevli.catalog.Review.items(config, db, list)));
+            return o;
+        } catch (Exception e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
     }
 
     private JsonObject catalog() {

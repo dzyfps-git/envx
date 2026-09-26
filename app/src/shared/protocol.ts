@@ -69,6 +69,21 @@ export interface Status {
   baselines: Baseline[];
   environments: Environment[];
   backgroundRunning: boolean;
+  /** The maintainer's install (indexes every jar): the app shows Review. */
+  owner?: boolean;
+}
+
+/** op "review" (maintainer's install only): jars indexed here that the public supported list does not cover as they are. */
+export interface ReviewResult {
+  catalogVersion: number | null;
+  items: {
+    env: string;
+    file: string;
+    modId?: string | null;
+    version?: string | null;
+    kind: "new_mod" | "new_version" | "retired" | "revoked";
+    publishedVersions?: string | null;
+  }[];
 }
 
 export type AgentId = "claude" | "codex";
