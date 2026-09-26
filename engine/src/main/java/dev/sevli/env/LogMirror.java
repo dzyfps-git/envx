@@ -52,6 +52,7 @@ public final class LogMirror {
         if (checked != null && checked.plus(maxAge).isAfter(Instant.now())) return null;
         Config.EnvDef def = config.environments.get(env);
         if (def == null || def.sources.isEmpty()) return "no source";
+        if (!def.logs) return "copying server logs is switched off for " + env + " (sevli logs " + env + " on)";
         try {
             EnvironmentSource source = EnvironmentSource.firstReachable(def.sources, m -> {});
             long since = Instant.now().minus(Duration.ofDays(config.logDays)).toEpochMilli();

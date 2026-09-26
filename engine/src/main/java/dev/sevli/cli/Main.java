@@ -41,6 +41,7 @@ public final class Main {
             Servers
               sevli list                       your servers and linked projects
               sevli accept <name>              index the jars on a server that became supported (Sevli never does it unasked)
+              sevli logs <name> on|off         copy the server's recent logs and crash reports (on by default)
               sevli history <name>             its versions; sevli diff <name> [<from> [<to>]] shows what changed
               sevli insights [--days 30]       what agents worked out by hand that Sevli could have answered
 
@@ -156,6 +157,16 @@ public final class Main {
                 config.save();
                 System.out.println(env + ": accepted supported list " + list.catalogVersion);
                 return sync(config, env, false);
+            }
+            case "logs" -> { // copying a server's logs and crash reports (ADR 0008), on by default
+                need(rest, 2, "sevli logs <name> on|off");
+                Config.EnvDef def = config.environments.get(rest.get(0));
+                if (def == null) throw new IllegalArgumentException("Unknown server " + rest.get(0) + " (sevli list shows them)");
+                def.logs = rest.get(1).equals("on");
+                config.save();
+                System.out.println(rest.get(0) + ": server logs and crash reports " + (def.logs
+                        ? "are copied again from the next check" : "are no longer copied (the copies already made stay until they age out)"));
+                return 0;
             }
             case "owner" -> { // the maintainer's own install indexes every jar to test it before publishing (ADR 0014); not in help
                 need(rest, 1, "sevli owner on|off");

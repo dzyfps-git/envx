@@ -214,6 +214,26 @@ class SupportGateTest {
     }
 
     @Test
+    void aConfigChangeMakesASnapshotWithoutJarWork() throws Exception {
+        publish(1, new Object[]{demo, 1, "active"});
+        Path server = server("server", demo);
+        Files.createDirectories(server.resolve("config"));
+        Files.writeString(server.resolve("config/demo.json"), "{\"radius\": 8}");
+        Config config = config("mine", server);
+        try (Db db = Db.open(config.home(), false)) {
+            Environments envs = new Environments(config, db);
+            long first = envs.sync("mine", m -> {}).snapshotId();
+            int artifacts = db.queryInt("SELECT count(*) FROM artifact");
+            Files.writeString(server.resolve("config/demo.json"), "{\"radius\": 16}");
+            List<String> progress = new java.util.ArrayList<>();
+            long second = envs.sync("mine", progress::add).snapshotId();
+            assertTrue(second > first, "a changed config is a new point in history");
+            assertEquals(artifacts, db.queryInt("SELECT count(*) FROM artifact"), "no jar was indexed again");
+            assertTrue(progress.contains("1 jars, 0 new or changed to fetch"), progress.toString());
+        }
+    }
+
+    @Test
     void fullCoverageAddsNoNote() throws Exception {
         publish(1, new Object[]{demo, 1, "active"});
         Config config = config("mine", server("server", demo));

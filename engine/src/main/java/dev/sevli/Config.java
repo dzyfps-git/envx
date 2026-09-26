@@ -73,6 +73,8 @@ public final class Config {
          * {@code sevli accept}). Jars that only a newer list supports wait for that click; nothing is indexed unasked.
          */
         public Integer supportAccepted;
+        /** Copy the server's recent logs and crash reports (ADR 0008); `sevli logs <name> off` stops it. */
+        public boolean logs = true;
 
         public boolean hides(String mixinSide) {
             return mixinSide != null && !mixinSide.equals("common") && side != null && !mixinSide.equals(side);
