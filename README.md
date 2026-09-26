@@ -106,4 +106,6 @@ added per run, and reports tokens, requests and answer facts (see `bench/README.
 - `docs/`: roadmap, ADRs and the query reference.
 
 ## License
-MIT (see `LICENSE`).
+MIT (see `LICENSE`). Bundled third-party components and their licences: `THIRD-PARTY-NOTICES.md`.
+
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.

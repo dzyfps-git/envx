@@ -34,7 +34,7 @@ public final class Traces {
             return kind.equals("shell");
         }
 
-        boolean envx() {
+        public boolean envx() {
             return kind.equals("envx");
         }
     }
@@ -61,6 +61,11 @@ public final class Traces {
     static Path claudeProjects() {
         String home = System.getenv("CLAUDE_CONFIG_DIR");
         return (home != null && !home.isBlank() ? Path.of(home) : Path.of(System.getProperty("user.home"), ".claude")).resolve("projects");
+    }
+
+    /** Sessions active since {@code since}, from where each tool keeps them on this PC. */
+    public static Result recent(Config config, Instant since) {
+        return read(config, since, codexSessions(), claudeProjects());
     }
 
     /** Sessions active since {@code since}; session files not modified since then are not opened. */

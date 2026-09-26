@@ -27,6 +27,16 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// The licence texts of everything bundled travel with every distribution (THIRD-PARTY-NOTICES.md).
+distributions {
+    main {
+        contents {
+            from('..') { include 'LICENSE', 'THIRD-PARTY-NOTICES.md' }
+            from('../licenses') { into 'licenses' }
+        }
+    }
+}
+
 application {
     mainClass = 'dev.envx.cli.Main'
     applicationName = 'envx'

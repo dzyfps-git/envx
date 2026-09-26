@@ -178,6 +178,14 @@ public final class AgentSetup {
     }
 
     /** {@link #summary} for callers outside this package (the app server). */
+    /** Each agent's envx state for the desktop app: Codex null = not registered; instruction files with an envx block. */
+    public record AgentState(boolean claudeOn, Boolean codexOn, int instructionFiles, int projects) {}
+
+    public static AgentState state(Config config) throws IOException {
+        State state = loadState(config);
+        return new AgentState(claudeRegistered(), codexEnabled(), blockFiles(config, state).size(), instructionTargets(config, state).size());
+    }
+
     public static String summaryLine(Config config) throws IOException {
         return summary(config);
     }

@@ -72,6 +72,8 @@ public final class AppServer {
                 case "home.set" -> ok(id, setHome(str(req, "dir")));
                 case "install" -> install(id, str(req, "target"));
                 case "cancel" -> ok(id, cancel(str(req, "target")));
+                case "agents" -> ok(id, Agents.state(config));
+                case "agents.activity" -> background(id, () -> Agents.activity(config));
                 default -> fail(id, "unknown_op", "unknown op '" + op + "'");
             }
         } catch (IllegalArgumentException | IllegalStateException e) {
@@ -102,6 +104,9 @@ public final class AppServer {
     /** Chooses where data goes before the first install; afterwards moving it is a separate operation. */
     private JsonObject setHome(String dir) throws IOException {
         if (dir == null || dir.isBlank()) throw new IllegalArgumentException("dir is required");
+        if (System.getProperty("envx.home") != null || System.getenv("ENVX_HOME") != null) {
+            throw new IllegalStateException("the data location is fixed by ENVX_HOME (or -Denvx.home) for this run");
+        }
         Path target = Path.of(dir).toAbsolutePath().normalize();
         if (Files.exists(config.home().resolve("config.json")) && !target.equals(config.home())) {
             throw new IllegalStateException("data already lives in " + config.home() + "; moving it is done from Settings");
@@ -234,6 +239,19 @@ public final class AppServer {
                 running.remove(target);
             }
         }, "install-" + target);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** Answers later from its own thread, so slow reads (agent sessions) do not hold up other requests. */
+    private void background(JsonElement id, java.util.function.Supplier<JsonElement> work) {
+        Thread t = new Thread(() -> {
+            try {
+                ok(id, work.get());
+            } catch (RuntimeException e) {
+                fail(id, "internal", String.valueOf(e));
+            }
+        }, "app-request");
         t.setDaemon(true);
         t.start();
     }

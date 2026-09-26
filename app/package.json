@@ -1,0 +1,75 @@
+{
+  "name": "envx-app",
+  "productName": "envx",
+  "version": "0.1.0",
+  "description": "envx desktop app: pick supported Minecraft baselines and modpacks, and let your coding agents use them.",
+  "license": "MIT",
+  "private": true,
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && node scripts/prepare-resources.mjs && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.3"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "build": {
+    "appId": "dev.envx.app",
+    "productName": "envx",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/runtime",
+        "to": "runtime"
+      },
+      {
+        "from": "resources/engine",
+        "to": "engine"
+      },
+      {
+        "from": "../licenses",
+        "to": "licenses"
+      },
+      {
+        "from": "../THIRD-PARTY-NOTICES.md",
+        "to": "THIRD-PARTY-NOTICES.md"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE.envx.txt"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "envx-setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}
