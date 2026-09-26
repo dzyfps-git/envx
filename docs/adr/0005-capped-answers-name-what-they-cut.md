@@ -1,17 +1,17 @@
 # ADR 0005: Capped answers name what they cut; server searches hide client code
 
-Status: accepted (2026-09-24, envx 0.2.1)
+Status: accepted (2026-09-24, Sevli 0.2.1)
 
 ## Context
 The 0.2.0 rerun (Codex, GPT-6 Sol at Extra High, 2 runs per cell) cut model requests by 41% and uncached input by
-59% against no envx. Q14 ("which classes in open-parties-and-claims handle chunk claim ticking?") stayed
-incomplete in every run, with or without envx.
+59% against no Sevli. Q14 ("which classes in open-parties-and-claims handle chunk claim ticking?") stayed
+incomplete in every run, with or without Sevli.
 
-Both envx runs searched `find "*Tick* mod:openpartiesandclaims"`. The answer listed matches alphabetically and was
+Both Sevli runs searched `find "*Tick* mod:openpartiesandclaims"`. The answer listed matches alphabetically and was
 cut at the 6000-character cap with "… 30 more line(s) omitted; narrow the pattern or add mod:<id>". The cut part
 held the expected classes (`PlayerClaimReplaceSpreadoutTask.onTick`, `ServerSpreadoutTaskHandler.onTick`,
 `ChunkProtection.onServerTick`), while 13 lines of client-only code (`xaero.pac.client.*`) used up space on a
-server environment. The hint also suggested `mod:`, which the query already had. Q14's two envx runs had 11
+server environment. The hint also suggested `mod:`, which the query already had. Q14's two Sevli runs had 11
 answers at the cap.
 
 ## Decisions

@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const lib = path.resolve(app, "..", "engine", "build", "install", "envx", "lib");
+const lib = path.resolve(app, "..", "engine", "build", "install", "sevli", "lib");
 const javaHome = process.env.JAVA_HOME;
 if (!javaHome) throw new Error("Set JAVA_HOME to a JDK 21");
 if (!existsSync(lib)) throw new Error(`Build the engine first (engine: ./gradlew installDist); missing ${lib}`);

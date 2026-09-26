@@ -1,4 +1,4 @@
-// The engine's app protocol (envx app-server, protocol 1; ADR 0013), as the renderer sees it.
+// The engine's app protocol (sevli app-server, protocol 1; ADR 0013), as the renderer sees it.
 
 export interface Home {
   dir: string;
@@ -50,7 +50,7 @@ export interface Environment {
 }
 
 export interface Status {
-  envx: string;
+  sevli: string;
   home: Home;
   agents: string;
   baselines: Baseline[];
@@ -65,8 +65,8 @@ export interface Agent {
   id: AgentId;
   name: string;
   installed: boolean;
-  /** envx is switched on for this agent. */
-  envx: boolean;
+  /** sevli is switched on for this agent. */
+  sevli: boolean;
   registered: boolean;
   model?: string | null;
   /** Reasoning effort as the agent's settings name it (low, medium, high, xhigh, max...); null = its default. */
@@ -78,7 +78,7 @@ export interface Agent {
 export interface AgentActivity {
   /** One value per day, oldest first; the last is today. */
   sessions: number[];
-  envxCalls: number[];
+  sevliCalls: number[];
   lastModel?: string | null;
   lastSession?: string | null;
 }
@@ -107,7 +107,7 @@ export interface ProgressEvent {
   line: string;
 }
 
-/** What the preload script exposes to the page as window.envx. */
+/** What the preload script exposes to the page as window.sevli. */
 export interface Bridge {
   /** progressKey: progress lines of this request arrive through onProgress with that key. */
   request<T>(op: string, params?: Record<string, unknown>, progressKey?: string): Promise<T>;

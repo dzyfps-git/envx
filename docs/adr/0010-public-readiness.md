@@ -1,24 +1,24 @@
 # ADR 0010: Public readiness
 
-Status: accepted (envx 0.7.0); published at 1.0.0 (see Publishing)
+Status: accepted (Sevli 0.7.0); published at 1.0.0 (see Publishing)
 
 ## Context
-Until 0.6 envx assumed one machine: the base came only from a Loom cache, the data home was found by probing a
+Until 0.6 Sevli assumed one machine: the base came only from a Loom cache, the data home was found by probing a
 drive letter, launchers and Java paths were Windows-only, and every end-to-end test needed the owner's synced index,
 so a fresh checkout or CI could only run unit tests.
 
 ## Decisions
 1. **Base without Loom.** (Superseded by ADR 0013 in 1.5.0: the Loom cache is no longer read, and a baseline is
-   downloaded only when the user installs it.) `envx init` (and the first sync) takes Minecraft + Yarn from the Loom cache when present,
+   downloaded only when the user installs it.) `sevli init` (and the first sync) takes Minecraft + Yarn from the Loom cache when present,
    else downloads the client and server jars from Mojang (SHA-1 from Mojang's version metadata, server bundler
    entries by their SHA-256) and Yarn from the Fabric maven (the maven's `.sha256`/`.sha1`), then merges and remaps
    locally with tiny-remapper. A mismatch refuses the file. For 1.20.1 / Yarn build.10 the result has the same 7436
    classes, members, supertypes and resources as Loom's merged jar; the Yarn javadoc and unpick files are identical.
-   The merge keeps client classes and adds server-only members, without Loom's `@Environment` marks (envx decides
+   The merge keeps client classes and adds server-only members, without Loom's `@Environment` marks (Sevli decides
    client-only code by package).
-2. **Data home:** `envx.home` property, `ENVX_HOME`, then `~/.envx/location` (one line, for a home on another
-   drive), then `~/.envx`. No drive-letter probing.
-3. **Cross-platform:** launcher `app/envx.cmd` on Windows, `app/envx` (sh) elsewhere; `java`/`claude` executables
+2. **Data home:** `sevli.home` property, `SEVLI_HOME`, then `~/.sevli/location` (one line, for a home on another
+   drive), then `~/.sevli`. No drive-letter probing.
+3. **Cross-platform:** launcher `app/sevli.cmd` on Windows, `app/sevli` (sh) elsewhere; `java`/`claude` executables
    per OS; Codex config honors `CODEX_HOME`.
 4. **Denied roots are enforced for projects too:** `check_mixins <dir>`, `project:` and `project index` never read a
    folder inside `denyRoots`, including when the agent works inside one.

@@ -27,4 +27,4 @@ jobs:
           cache: gradle
       # Unit tests run everywhere; golden tests need a synced environment and skip themselves on CI.
       - run: ./gradlew test installDist --no-daemon
-      - run: build/install/envx/bin/envx help
+      - run: build/install/sevli/bin/sevli help

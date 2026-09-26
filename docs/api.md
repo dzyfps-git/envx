@@ -1,18 +1,18 @@
-# Machine interface (`envx api`, version 1)
+# Machine interface (`sevli api`, version 1)
 
-Status: **implemented in envx 1.1.0.** Within version 1, operations and fields are only added.
+Status: **implemented in Sevli 1.1.0.** Within version 1, operations and fields are only added.
 
 The CLI and MCP answers are compact text written for agents and are not a stable format. Programs use this
-interface instead, and never read envx's database, whose schema changes through migrations.
+interface instead, and never read Sevli's database, whose schema changes through migrations.
 
 ## Transport
-- `envx api` reads requests as JSON lines on stdin and writes one JSON line per request to stdout, in order, then
+- `sevli api` reads requests as JSON lines on stdin and writes one JSON line per request to stdout, in order, then
   exits at end of input. Batch many lookups into one process: each start costs a JVM launch (about 0.5-1 s).
-- `envx api --version` prints `{"api":1,"envx":"1.1.0"}`.
-- Launcher: `<data home>/app/envx` (Linux/macOS) or `envx.cmd` (Windows). Through `cmd.exe` with a quoted path, wrap
-  the whole command in one more pair of quotes: `cmd /d /s /c ""C:\path\envx.cmd" api"`.
+- `sevli api --version` prints `{"api":1,"sevli":"1.1.0"}`.
+- Launcher: `<data home>/app/sevli` (Linux/macOS) or `sevli.cmd` (Windows). Through `cmd.exe` with a quoted path, wrap
+  the whole command in one more pair of quotes: `cmd /d /s /c ""C:\path\sevli.cmd" api"`.
 - Read-only: the index is opened read-only, and an api call never starts a sync, even when the environment is due
-  for one. Nothing sent to envx is stored.
+  for one. Nothing sent to Sevli is stored.
 
 ## Envelope
 Request: `{"id": <any JSON value, echoed>, "op": "<operation>", ...parameters}`
@@ -38,8 +38,8 @@ Clients ignore fields they do not know. A breaking change would be `"api": 2`, s
   (ids lowercased, versions as printed, build metadata after `+` kept), including `java`, `minecraft` and
   `fabricloader`. This is the list whose size is the log's `Loading N mods` and what `FabricLoader.getAllMods()`
   returns (spark's list, for example): the loader's printed tree also shows nested client-only jars that a dedicated
-  server does not load, and envx leaves those out. Snapshots that differ only in configs share a modset: the code is
-  the same. Snapshots without a loader list (before envx 0.3, or an imported backup without logs) have `"modset":
+  server does not load, and Sevli leaves those out. Snapshots that differ only in configs share a modset: the code is
+  the same. Snapshots without a loader list (before Sevli 0.3, or an imported backup without logs) have `"modset":
   null` and never match.
 - Classes use runtime (intermediary) names, dotted or slashed (`net.minecraft.class_1309` or
   `net/minecraft/class_1309`); inner classes with `$`. Methods are name plus JVM descriptor. Answers are dotted.
@@ -52,8 +52,8 @@ Clients ignore fields they do not know. A breaking change would be `"api": 2`, s
 ### `snapshots`
 `{"op":"snapshots","env":"myserver"}` →
 `{"env":"myserver","snapshots":[{"id":12,"fingerprint":"…","modset":"…","label":"4.1.0","kind":"sync","taken_at":"…","checked_at":"…","current":true}, …]}`,
-newest first. `kind` is `sync` (seen on the live source) or `import` (a past pack folder). `taken_at` is when envx
-first saw it, not when the server started with it: envx sees a change only at its next sync.
+newest first. `kind` is `sync` (seen on the live source) or `import` (a past pack folder). `taken_at` is when Sevli
+first saw it, not when the server started with it: Sevli sees a change only at its next sync.
 
 ### `match`
 Which snapshots ran this mod set?
@@ -82,7 +82,7 @@ Who defines these methods?
   load (an older nested duplicate, a client-only library on a server); `nested_in` lists the jars bundling it
   (`{"mod","version","sha256"}`).
 - `status`: `probable` (exactly one loaded candidate), `ambiguous` (several loaded; all listed, none preferred),
-  `none` (no loaded candidate). envx never answers `exact`: it knows what the jars contain, not which bytes the JVM
+  `none` (no loaded candidate). Sevli never answers `exact`: it knows what the jars contain, not which bytes the JVM
   loaded.
 - `member_found`: null when no `method` was given. `yarn` fields are null when unknown.
 - What is indexed: Minecraft and every mod jar (with nested jars). The JDK, Minecraft's bundled libraries (Guava,
@@ -91,7 +91,7 @@ Who defines these methods?
   `lambda$…` methods are members of their class and resolve normally.
 - **Merged mixin methods.** Mixin renames injected handlers into the target class as
   `<kind>$<hash>$<modid>$<handler>` (handler, redirect, modify, wrapOperation, localvar, …). The hash changes between
-  runs, so envx ignores it and matches (target class, mod id, handler name) against the declared mixins. Then
+  runs, so Sevli ignores it and matches (target class, mod id, handler name) against the declared mixins. Then
   `candidates` is that mixin's jar, `yarn.method` is the handler, and
   `"mixin":{"mixin_class","config","kind","handler","target","at","priority","cancellable","side","failed","mod","version","sha256"}`
   (the same fields as `mixins` below).
@@ -120,5 +120,5 @@ What changed between two snapshots? `from` and `to` are snapshot ids or fingerpr
 Loaded jars with a mod id, compared by mod id.
 
 ## Not in this interface
-Anything written by envx on request (sync, import, setup), source code and decompilation, and any storage of the
+Anything written by Sevli on request (sync, import, setup), source code and decompilation, and any storage of the
 caller's data. Callers keep their own results, keyed by `fingerprint` or `modset`.

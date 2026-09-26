@@ -60,8 +60,8 @@ function cap(s: string): string {
   return s[0].toUpperCase() + s.slice(1);
 }
 
-/** The agent to focus first: the last one chosen, else one with envx on, else Claude Code. */
+/** The agent to focus first: the last one chosen, else one with sevli on, else Claude Code. */
 export function initialAgent(agents: Agent[], remembered?: string | null): AgentId {
   if (remembered === "claude" || remembered === "codex") return remembered;
-  return agents.find((a) => a.installed && a.envx)?.id ?? agents.find((a) => a.installed)?.id ?? "claude";
+  return agents.find((a) => a.installed && a.sevli)?.id ?? agents.find((a) => a.installed)?.id ?? "claude";
 }

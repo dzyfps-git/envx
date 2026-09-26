@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Home } from "../../../shared/protocol";
-import { envx, errorText, size } from "../../api";
+import { sevli, errorText, size } from "../../api";
 
 export interface Downloadable {
   id: string;
@@ -27,7 +27,7 @@ export function DownloadDialog({ item, home, onClose }: { item: Downloadable; ho
 
   useEffect(() => {
     ref.current?.showModal();
-    return envx.onProgress((e) => {
+    return sevli.onProgress((e) => {
       if (e.key === key.current) setLines((l) => [...l.slice(-200), e.line]);
     });
   }, []);
@@ -37,15 +37,15 @@ export function DownloadDialog({ item, home, onClose }: { item: Downloadable; ho
   }, [lines]);
 
   async function change() {
-    const picked = await envx.pickFolder("Where should envx keep its data?", dir);
-    if (picked) setDir(/[\\/]envx$/i.test(picked) ? picked : `${picked}${picked.endsWith("\\") ? "" : "\\"}envx`);
+    const picked = await sevli.pickFolder("Where should Sevli keep its data?", dir);
+    if (picked) setDir(/[\\/]sevli$/i.test(picked) ? picked : `${picked}${picked.endsWith("\\") ? "" : "\\"}Sevli`);
   }
 
   async function start() {
     setPhase("working");
     try {
-      if (firstInstall && dir !== home.dir) await envx.request("home.set", { dir });
-      await envx.request("install", { target: item.id }, key.current);
+      if (firstInstall && dir !== home.dir) await sevli.request("home.set", { dir });
+      await sevli.request("install", { target: item.id }, key.current);
       setPhase("done");
     } catch (e) {
       setError(errorText(e));
@@ -54,7 +54,7 @@ export function DownloadDialog({ item, home, onClose }: { item: Downloadable; ho
   }
 
   async function cancel() {
-    await envx.request("cancel", { target: item.id }).catch(() => undefined);
+    await sevli.request("cancel", { target: item.id }).catch(() => undefined);
   }
 
   function close() {

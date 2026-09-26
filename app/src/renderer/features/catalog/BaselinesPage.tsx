@@ -21,7 +21,7 @@ export function BaselinesPage({ data }: { data: AppData }) {
                 <div className="t">
                   {b.name}
                   {b.installed && <span className="tag ok">Installed</span>}
-                  {!b.supported && <span className="tag warn">Needs a newer envx</span>}
+                  {!b.supported && <span className="tag warn">Needs a newer Sevli</span>}
                 </div>
                 <div className="figs">
                   <span>Download <b>{size(b.downloadBytes)}</b></span>
@@ -33,7 +33,7 @@ export function BaselinesPage({ data }: { data: AppData }) {
           ))}
         </div>
       </div>
-      <div className="note faint">More baselines (other Minecraft versions and loaders) appear here as envx supports them.</div>
+      <div className="note faint">More baselines (other Minecraft versions and loaders) appear here as Sevli supports them.</div>
       {downloading && data.status && (
         <DownloadDialog item={downloading} home={data.status.home} onClose={(installed) => { setDownloading(undefined); if (installed) void data.refresh(); }} />
       )}

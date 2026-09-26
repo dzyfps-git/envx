@@ -2,8 +2,8 @@ plugins {
     id 'application'
 }
 
-group = 'dev.envx'
-version = '1.5.0'
+group = 'dev.sevli'
+version = '2.0.0'
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
@@ -38,8 +38,8 @@ distributions {
 }
 
 application {
-    mainClass = 'dev.envx.cli.Main'
-    applicationName = 'envx'
+    mainClass = 'dev.sevli.cli.Main'
+    applicationName = 'sevli'
     applicationDefaultJvmArgs = ['-Xss4m', '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8']
 }
 
@@ -48,8 +48,18 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }
 
+// `envx`, the name before 2.0, keeps working for the 2.x line: a second start script that runs sevli and says so once.
+def envxScripts = tasks.register('envxStartScripts', CreateStartScripts) {
+    mainClass = application.mainClass
+    applicationName = 'envx'
+    outputDir = layout.buildDirectory.dir('envx-scripts').get().asFile
+    classpath = tasks.named('startScripts').get().classpath
+    defaultJvmOpts = application.applicationDefaultJvmArgs + ['-Dsevli.alias=envx']
+}
+distributions.main.contents { from(envxScripts) { into 'bin' } }
+
 test {
     useJUnitPlatform()
     // Golden tests that need the local Loom cache / pack are skipped automatically when it is absent.
-    systemProperty 'envx.home', System.getProperty('envx.home', '')
+    systemProperty 'sevli.home', System.getProperty('sevli.home', '')
 }

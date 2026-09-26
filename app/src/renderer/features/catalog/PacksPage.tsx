@@ -8,7 +8,7 @@ export function PacksPage({ data }: { data: AppData }) {
   return (
     <>
       <PageHead crumb="Indexes" title="Modpacks"
-        sub="Modpacks prepared and tested for envx. Their mods come from Modrinth or CurseForge and are checked against the published list before anything is indexed." />
+        sub="Modpacks prepared and tested for Sevli. Their mods come from Modrinth or CurseForge and are checked against the published list before anything is indexed." />
       {c?.error && <div className="banner tone-warn"><div className="banner-text">The catalog can't be reached right now, so modpacks aren't listed. Baselines still work.</div></div>}
       <div className="panel">
         <div className="panel-head"><h2>Catalog</h2><span className="panel-meta">{packs.length} published</span></div>
@@ -22,7 +22,7 @@ export function PacksPage({ data }: { data: AppData }) {
                   <div className="t">
                     {p.name} {v && <span className="faint">{v.version}</span>}
                     {p.installed && <span className="tag ok">Installed</span>}
-                    {!p.supported && <span className="tag warn">Needs a newer envx</span>}
+                    {!p.supported && <span className="tag warn">Needs a newer Sevli</span>}
                   </div>
                   {p.summary && <div className="s">{p.summary}</div>}
                   {v && (

@@ -15,7 +15,7 @@ bench/expected/
 bench/questions.md
 bench/findings.md
 bench/RUNBOOK.md
-engine/src/test/java/dev/envx/GoldenIndexTest.java
+engine/src/test/java/dev/sevli/GoldenIndexTest.java
 
 # Editors / OS
 .idea/

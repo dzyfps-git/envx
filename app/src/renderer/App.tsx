@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Activity, Agent, AgentId, CatalogResult, EngineState, Status } from "../shared/protocol";
-import { envx, errorText } from "./api";
+import { sevli, errorText } from "./api";
 import { Icon, IconName } from "./ui/Icon";
 import { Backdrop } from "./ui/Backdrop";
 import { energy, initialAgent, PALETTES } from "./ui/theme";
@@ -41,7 +41,7 @@ export interface AppData {
 const PREVIEW = new URLSearchParams(location.search);
 
 function remembered(): string | null {
-  try { return localStorage.getItem("envx.agent"); } catch { return null; }
+  try { return localStorage.getItem("sevli.agent"); } catch { return null; }
 }
 
 export function App() {
@@ -57,7 +57,7 @@ export function App() {
   const refresh = useCallback(async () => {
     try {
       const [s, c, a] = await Promise.all([
-        envx.request<Status>("status"), envx.request<CatalogResult>("catalog"), envx.request<Agent[]>("agents")]);
+        sevli.request<Status>("status"), sevli.request<CatalogResult>("catalog"), sevli.request<Agent[]>("agents")]);
       setStatus(s);
       setCatalog(c);
       setAgents(a);
@@ -66,19 +66,19 @@ export function App() {
     } catch (e) {
       setError(errorText(e));
     }
-    envx.request<Activity>("agents.activity").then(setActivity, () => undefined);
+    sevli.request<Activity>("agents.activity").then(setActivity, () => undefined);
   }, []);
 
   useEffect(() => {
-    void envx.engineState().then(setEngine);
-    const off = envx.onEngineState(setEngine);
+    void sevli.engineState().then(setEngine);
+    const off = sevli.onEngineState(setEngine);
     void refresh();
     return off;
   }, [refresh]);
 
   function choose(id: AgentId) {
     setFocus(id);
-    try { localStorage.setItem("envx.agent", id); } catch { /* remembered for this run only */ }
+    try { localStorage.setItem("sevli.agent", id); } catch { /* remembered for this run only */ }
   }
 
   const agent = agents?.find((a) => a.id === focus);
@@ -110,7 +110,7 @@ export function App() {
         ))}
         <div className="rail-foot">
           <span className={"dot " + (engine.running ? "ok" : "warn")} title={engine.running ? "Engine running" : engine.message} />
-          <span className="ver">{status?.envx ?? ""}</span>
+          <span className="ver">{status?.sevli ?? ""}</span>
         </div>
       </nav>
       <main className="stage" key={page}>
@@ -141,7 +141,7 @@ function TopBar({ data, engine, focus, choose }: { data: AppData; engine: Engine
   return (
     <header className="topbar">
       <div className="brandline">
-        <div className="wordmark display">ENV<span>X</span></div>
+        <div className="wordmark display">SEVL<span>I</span></div>
         <div className="statusline">
           <span className={"pulse" + (state === "Online" ? "" : " warn")} />
           Core · {state} · {busy} · {envs.length} {envs.length === 1 ? "environment" : "environments"}
@@ -151,7 +151,7 @@ function TopBar({ data, engine, focus, choose }: { data: AppData; engine: Engine
         <span className="switch-glow" />
         {agents.map((a) => (
           <button key={a.id} role="tab" aria-selected={a.id === focus} className={a.id === focus ? "on" : ""} onClick={() => choose(a.id)}>
-            <span className={"adot" + (!a.installed ? " missing" : a.envx ? " live" : "")} />
+            <span className={"adot" + (!a.installed ? " missing" : a.sevli ? " live" : "")} />
             {a.name}
           </button>
         ))}

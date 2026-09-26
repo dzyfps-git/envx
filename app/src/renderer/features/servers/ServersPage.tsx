@@ -7,7 +7,7 @@ export function ServersPage({ data }: { data: AppData }) {
   return (
     <>
       <PageHead crumb="Indexes" title="My servers"
-        sub="Optional: connect your own server so agents know exactly what it runs. envx only reads from it, and only servers on a supported baseline can be added." />
+        sub="Optional: connect your own server so agents know exactly what it runs. Sevli only reads from it, and only servers on a supported baseline can be added." />
       <div className="panel">
         <div className="panel-head"><h2>Connected</h2><span className="panel-meta">{envs.length}</span></div>
         <div className="panel-body">

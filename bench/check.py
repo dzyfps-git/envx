@@ -1,23 +1,23 @@
-"""Tier-1 benchmark checks: does envx surface the facts each benchmark question needs? No agent runs, no credits.
+"""Tier-1 benchmark checks: does sevli surface the facts each benchmark question needs? No agent runs, no credits.
 
 Each answer key in bench/expected/NN.md may hold a ```check block:
 
     cwd: {my-mod}                       working directory for the calls (project detection, default env); a
                                         {name} is a workspace from bench/local.json (machine-specific, not tracked)
     until: 2027-01-01                   skip after this date (runtime evidence such as crash reports ages out)
-    run: check_mixins                   an envx CLI command line, as typed after `envx` (quote args with spaces)
+    run: check_mixins                   an sevli CLI command line, as typed after `sevli` (quote args with spaces)
     expect: 0 error(s)                  must appear in the combined output (case-insensitive); re:<regex> for a regex
     expect-not: xaero.pac.client.       must not appear
     answer: ServerTickHandler           a fact a correct agent answer states (for `grade`); re:<regex> allowed
 
 Commands
-    python bench/check.py run [Q ...] [--envx build|<version>|<lib dir>]   run the checks; saves results/checks-<version>.json
-    python bench/check.py compare <old.json> <new.json>                    answer sizes and failures across envx versions
+    python bench/check.py run [Q ...] [--sevli build|<version>|<lib dir>]   run the checks; saves results/checks-<version>.json
+    python bench/check.py compare <old.json> <new.json>                    answer sizes and failures across sevli versions
     python bench/check.py grade <Q> <answer.txt>                           which required facts an agent answer states
-    python bench/check.py replay [--session S ...] [--since T] [--via mcp] re-run recorded envx calls, old vs new size
+    python bench/check.py replay [--session S ...] [--since T] [--via mcp] re-run recorded sevli calls, old vs new size
 
-`--envx build` (default) uses engine/build/install; a version uses <data home>/app/<version>. Calls are tagged
-"bench" in envx's call log so they never mix with real agent sessions.
+`--sevli build` (default) uses engine/build/install; a version uses <data home>/app/<version>. Calls are tagged
+"bench" in sevli's call log so they never mix with real agent sessions.
 """
 from __future__ import annotations
 
@@ -38,40 +38,40 @@ PRIMARY = {"grep": "pattern", "find": "query", "env": "filter", "outline": "targ
            "refs": "target", "mixins": "target", "check_mixins": "project"}
 
 
-def data_home() -> Path:  # same order as dev.envx.Config.resolveHome
-    if os.environ.get("ENVX_HOME"):
-        return Path(os.environ["ENVX_HOME"])
-    location = Path.home() / ".envx" / "location"  # one line: a data home kept elsewhere
+def data_home() -> Path:  # same order as dev.sevli.Config.resolveHome
+    if os.environ.get("SEVLI_HOME"):
+        return Path(os.environ["SEVLI_HOME"])
+    location = Path.home() / ".sevli" / "location"  # one line: a data home kept elsewhere
     if location.is_file() and location.read_text(encoding="utf-8").strip():
         return Path(location.read_text(encoding="utf-8").strip())
-    return Path.home() / ".envx"
+    return Path.home() / ".sevli"
 
 
-def lib_dir(envx: str) -> Path:
-    if envx == "build":
-        return REPO / "engine" / "build" / "install" / "envx" / "lib"
-    if re.fullmatch(r"\d+\.\d+\.\d+.*", envx):
-        return data_home() / "app" / envx / "lib"
-    return Path(envx)
+def lib_dir(sevli: str) -> Path:
+    if sevli == "build":
+        return REPO / "engine" / "build" / "install" / "sevli" / "lib"
+    if re.fullmatch(r"\d+\.\d+\.\d+.*", sevli):
+        return data_home() / "app" / sevli / "lib"
+    return Path(sevli)
 
 
 def version_of(lib: Path) -> str:
-    jars = sorted(lib.glob("envx-*.jar"))
+    jars = sorted(lib.glob("sevli-*.jar"))
     if not jars:
-        sys.exit(f"no envx jar in {lib}")
-    return jars[0].stem.removeprefix("envx-")
+        sys.exit(f"no sevli jar in {lib}")
+    return jars[0].stem.removeprefix("sevli-")
 
 
 def java() -> str:
-    if os.environ.get("ENVX_JAVA"):
-        return os.environ["ENVX_JAVA"]
+    if os.environ.get("SEVLI_JAVA"):
+        return os.environ["SEVLI_JAVA"]
     if os.environ.get("JAVA_HOME") and Path(os.environ["JAVA_HOME"], "bin").is_dir():
         return str(Path(os.environ["JAVA_HOME"], "bin", "java"))
     return "java"
 
 
-def envx(lib: Path, args: list[str], cwd: str) -> tuple[str, int]:
-    cmd = [java(), "-Xss4m", "-Denvx.via=bench", "-cp", str(lib / "*"), "dev.envx.cli.Main", *args]
+def sevli(lib: Path, args: list[str], cwd: str) -> tuple[str, int]:
+    cmd = [java(), "-Xss4m", "-Dsevli.via=bench", "-cp", str(lib / "*"), "dev.sevli.cli.Main", *args]
     t0 = time.time()
     r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     err = "\n".join(l for l in r.stderr.splitlines() if not l.startswith("WARNING:"))
@@ -128,9 +128,9 @@ def found(pattern: str, text: str) -> bool:
 
 
 def cmd_run(a) -> None:
-    lib = lib_dir(a.envx)
+    lib = lib_dir(a.sevli)
     ver = version_of(lib)
-    results = {"envx": ver, "at": dt.datetime.now().isoformat(timespec="seconds"), "questions": {}}
+    results = {"sevli": ver, "at": dt.datetime.now().isoformat(timespec="seconds"), "questions": {}}
     total_fail = 0
     for q, spec in keys(a.questions).items():
         if spec["until"] and dt.date.today().isoformat() > spec["until"]:
@@ -142,7 +142,7 @@ def cmd_run(a) -> None:
             continue
         calls, text = [], ""
         for line in spec["run"]:
-            out, ms = envx(lib, split_args(line), cwd)
+            out, ms = sevli(lib, split_args(line), cwd)
             calls.append({"run": line, "chars": len(out), "ms": ms, "first": out.splitlines()[0][:160] if out else ""})
             text += "\n" + out
         fails = [e for e in spec["expect"] if not found(e, text)] + [f"not {e}" for e in spec["expect-not"] if found(e, text)]
@@ -162,13 +162,13 @@ def cmd_run(a) -> None:
         old = json.loads(out.read_text(encoding="utf-8"))
         results["questions"] = {**old.get("questions", {}), **results["questions"]}
     out.write_text(json.dumps(results, indent=1), encoding="utf-8")
-    print(f"envx {ver}: {'all facts found' if not total_fail else f'{total_fail} missing'}; saved {out.relative_to(REPO)}")
+    print(f"sevli {ver}: {'all facts found' if not total_fail else f'{total_fail} missing'}; saved {out.relative_to(REPO)}")
     sys.exit(1 if total_fail else 0)
 
 
 def cmd_compare(a) -> None:
     old, new = (json.loads(Path(p).read_text(encoding="utf-8")) for p in (a.old, a.new))
-    print(f"| Q | {old['envx']} chars | {new['envx']} chars | change | {old['envx']} failed | {new['envx']} failed |")
+    print(f"| Q | {old['sevli']} chars | {new['sevli']} chars | change | {old['sevli']} failed | {new['sevli']} failed |")
     print("|---|---|---|---|---|---|")
     for q in sorted(set(old["questions"]) | set(new["questions"]), key=lambda x: int(x) if x.isdigit() else 0):
         o, n = old["questions"].get(q), new["questions"].get(q)
@@ -191,7 +191,7 @@ def cmd_grade(a) -> None:
 
 
 def cmd_replay(a) -> None:
-    lib = lib_dir(a.envx)
+    lib = lib_dir(a.sevli)
     since = dt.datetime.fromisoformat(a.since).astimezone() if a.since else None
     rows = []
     for f in sorted(glob.glob(str(data_home() / "logs" / "calls-*.jsonl"))):
@@ -214,13 +214,13 @@ def cmd_replay(a) -> None:
             cmd += ["--filter", primary] if tool == "env" else [primary]
         for k, v in args.items():
             cmd += ["--" + k, v]
-        out, _ = envx(lib, cmd, r["cwd"])
+        out, _ = sevli(lib, cmd, r["cwd"])
         was += r["chars"]
         now += len(out)
         first = out.splitlines()[0] if out else ""
         print(f"{r['session'][-4:]} {tool:<12} {json.dumps(r['args'])[:80]}")
         print(f"      {r['chars']} -> {len(out)} chars: {first[:120]}")
-    print(f"{len(rows)} calls: {was} -> {now} chars ({(now - was) / max(was, 1):+.0%}) with envx {version_of(lib)}")
+    print(f"{len(rows)} calls: {was} -> {now} chars ({(now - was) / max(was, 1):+.0%}) with sevli {version_of(lib)}")
 
 
 def main() -> None:
@@ -228,8 +228,8 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("run")
     p.add_argument("questions", nargs="*")
-    p.add_argument("--envx", default="build")
-    p.add_argument("-v", "--verbose", action="store_true", help="print the envx answers")
+    p.add_argument("--sevli", default="build")
+    p.add_argument("-v", "--verbose", action="store_true", help="print the sevli answers")
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("compare")
     p.add_argument("old")
@@ -240,10 +240,10 @@ def main() -> None:
     p.add_argument("answer")
     p.set_defaults(fn=cmd_grade)
     p = sub.add_parser("replay")
-    p.add_argument("--session", action="append", help="session id from envx's call log (repeatable)")
+    p.add_argument("--session", action="append", help="session id from sevli's call log (repeatable)")
     p.add_argument("--since", help="local date/time, e.g. 2026-09-24T18:00")
     p.add_argument("--via", default="mcp")
-    p.add_argument("--envx", default="build")
+    p.add_argument("--sevli", default="build")
     p.set_defaults(fn=cmd_replay)
     a = ap.parse_args()
     a.fn(a)

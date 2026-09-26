@@ -7,7 +7,7 @@ The plan proposed one resident daemon, with every agent session reaching it thro
 was to avoid several JVMs writing to SQLite at once.
 
 ## Decision
-Build no daemon for now. Only `envx env sync`, run by the user or later the desktop app, writes to the index.
+Build no daemon for now. Only `sevli env sync`, run by the user or later the desktop app, writes to the index.
 Every MCP server process opens `index.sqlite` **read-only**. SQLite in WAL mode lets any number of readers run
 while one writer works.
 

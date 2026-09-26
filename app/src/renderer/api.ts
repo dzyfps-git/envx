@@ -2,11 +2,11 @@ import type { Bridge, EngineError } from "../shared/protocol";
 
 declare global {
   interface Window {
-    envx: Bridge;
+    sevli: Bridge;
   }
 }
 
-export const envx: Bridge = window.envx;
+export const sevli: Bridge = window.sevli;
 
 export function errorText(e: unknown): string {
   const err = e as Partial<EngineError> | undefined;

@@ -1,6 +1,6 @@
-# envx roadmap
+# Sevli roadmap
 
-envx is a local index of a Minecraft/Fabric 1.20.1 environment (a server's mods, configs, logs and history, the
+Sevli is a local index of a Minecraft/Fabric 1.20.1 environment (a server's mods, configs, logs and history, the
 Minecraft base with Yarn names, and your own mod projects) that coding agents query through MCP or a CLI instead of
 unzipping jars, running `javap` or decompiling by hand. It is the first part of a larger goal: one workspace for
 modding projects with Claude Code and Codex as first-class tools. The design decisions are in `docs/adr/`.
@@ -8,7 +8,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 ## Principles
 - **The index is the product.** Agents use it from the tools they already run; any future app is a client of it.
 - **Efficiency first.** Few tools, compact answers that stay within a budget and say what they cut (ADR 0003, 0005).
-- **Read-only toward environments.** envx never writes to a server, a share or an instance folder.
+- **Read-only toward environments.** Sevli never writes to a server, a share or an instance folder.
 - **Index bytecode, decompile in the background.** Jars are indexed once by content hash; sources are decompiled
   after a sync at idle priority (and on demand before that), each jar once (ADR 0011).
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
@@ -24,14 +24,14 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - 0.5: runtime evidence. Log errors, failed mixins and crashes grouped and resolved to mods (ADR 0008).
 - 0.6: pack-update impact. `env filter=diff:A..B` reports what an update means for the project in the working
   directory (ADR 0009).
-- 0.7: public readiness. `envx init` without a Loom cache, portable data home, Linux/macOS launchers, a fixture
+- 0.7: public readiness. `sevli init` without a Loom cache, portable data home, Linux/macOS launchers, a fixture
   environment that tests the whole pipeline, CI on three OSes (ADR 0010).
 - 0.8: stable contracts. The tool surface is snapshotted and documented (`docs/tools.md`), schema upgrades are
   guarded and tested.
 - 0.9: weak spots found by agent runs, each fixed with a check that fails on the version before.
-- 1.0: final validation. With envx, agents used a median of 88% fewer tokens at equal or better correctness on
+- 1.0: final validation. With Sevli, agents used a median of 88% fewer tokens at equal or better correctness on
   like-for-like pairs; CI green on Linux, Windows and macOS (`bench/README.md`).
-- 1.1: a stable machine interface for other tools: `envx api`, JSON lines, versioned, read-only, batch lookups with
+- 1.1: a stable machine interface for other tools: `sevli api`, JSON lines, versioned, read-only, batch lookups with
   portable identifiers (`docs/api.md`). On a server, nested client-only jars that the loader prints but does not
   load no longer count as loaded.
 - 1.2: `refs Class.member` finds a class's own uses and calls made through subclasses, picks the class that has the
@@ -40,24 +40,24 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   show them (`<mod>:<path>`), and a no-match search spends at most 5 s on past versions.
 - 1.3: indexing study decisions (ADR 0011). After a sync, every loaded jar is decompiled in a background process at
   idle priority, so `grep scope=source` searches all code instead of classes read before (it found more in 18 of 24
-  logged searches); `envx decompile --status|--stop`. 1.3.1: mods with a method whose Yarn name collides with an
+  logged searches); `sevli decompile --status|--stop`. 1.3.1: mods with a method whose Yarn name collides with an
   inherited Minecraft one (1 in 85 jars) are remapped with that member left under its runtime name instead of failing.
-- 1.4: trace mining (ADR 0012): `envx traces` reads Codex and Claude Code session files in place and reports the
-  shell work envx could have answered, what agents did right after an envx answer, answers that cost a follow-up and
-  slow calls. Everyday commands: `envx` (status), `envx on|off`, `envx sync`, `envx stop`, `envx setup --path`.
+- 1.4: trace mining (ADR 0012): `sevli insights` reads Codex and Claude Code session files in place and reports the
+  shell work Sevli could have answered, what agents did right after an Sevli answer, answers that cost a follow-up and
+  slow calls. Everyday commands: `sevli` (status), `sevli on|off`, `sevli sync`, `sevli stop`, `sevli setup --path`.
   Code search reads one packed file per decompiled jar: a cold search on a spinning disk went from 21 s to 4 s.
   1.4.1, from the first trace report: resource search reads packed files too (cold 55 s -> 1.6 s); grep says when the
   server's current log has matching lines it did not search; `env filter` says it matches jar file names.
   1.4.2: a sync packs each new jar's resources as it extracts them (no background process needed for that).
   1.4.3: config texts are packed per snapshot; remapped jars are removed once their classes are decompiled (150 MB
-  on a large pack); `envx traces` lists folders where agents worked without envx and whether they have envx's
+  on a large pack); `sevli insights` lists folders where agents worked without Sevli and whether they have Sevli's
   instructions, and counts Forge/NeoForge work separately; first-run status shows the setup steps; the Loom cache is
   found through `GRADLE_USER_HOME`.
-- 1.5: the engine side of the desktop app (ADR 0013). `envx catalog` lists supported baselines and published packs
-  with sizes; `envx catalog install <id>` downloads a baseline from the official sources. Nothing is downloaded or
+- 1.5: the engine side of the desktop app (ADR 0013). `sevli browse` lists supported baselines and published packs
+  with sizes; `sevli add <id>` downloads a baseline from the official sources. Nothing is downloaded or
   created unasked: syncs no longer fetch a baseline by themselves, the Loom cache is no longer read, and the data
   home appears with the first install. Own servers are refused unless they run a supported baseline.
-  `envx app-server` is the app's JSON-lines connection.
+  `sevli app-server` is the app's JSON-lines connection.
 
 ## Next: the desktop app (ADR 0013)
 A Windows app that starts empty and offers a curated catalog: supported baselines and modpacks prepared by the

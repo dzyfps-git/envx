@@ -8,7 +8,7 @@ found that 39% of the shell commands Codex ran across past sessions were environ
 Yarn Minecraft jar, unzipping mod jars, reading mappings and mixin configs, listing mods. That output was about 17M tokens.
 
 ## Decision
-- Ship a standalone **index engine** (`envx`) with a CLI and an MCP server before any desktop UI. It works from
+- Ship a standalone **index engine** (`sevli`) with a CLI and an MCP server before any desktop UI. It works from
   the Claude Code and Codex installs the user already has.
 - Write it in **plain Java 21**. The key libraries (ASM, mapping-io, tiny-remapper, Vineflower) are Java, and so
   are the user's mods. The code is mostly AI-written, so it sticks to one simple language with no Kotlin.

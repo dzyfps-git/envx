@@ -1,5 +1,5 @@
 instructions:
-envx: local index of this project's Minecraft/Fabric environment (the live server's mods, Minecraft 1.20.1, Yarn names).
+sevli: local index of this project's Minecraft/Fabric environment (the live server's mods, Minecraft 1.20.1, Yarn names).
 Use it instead of unzipping jars, running javap, searching Gradle caches or decompiling by hand.
 find/outline first; source for code (Class.a,b fetches several members at once); refs/mixins/check_mixins for callers and injections.
 Add mod:<id> to a query to search inside specific mods. Answers are size-capped and state what they cover.

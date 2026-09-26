@@ -1,13 +1,13 @@
 # Third-party notices
 
-envx is MIT-licensed (`LICENSE`). It ships with, or builds on, the components below; their licence texts are in
+Sevli is MIT-licensed (`LICENSE`). It ships with, or builds on, the components below; their licence texts are in
 `licenses/`.
 
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 
-envx contains no Minecraft code or assets. Minecraft files are downloaded from Mojang's own servers onto your PC,
+Sevli contains no Minecraft code or assets. Minecraft files are downloaded from Mojang's own servers onto your PC,
 and anything decompiled from them stays on your PC. Mods and modpacks are downloaded from where their authors
-publish them. envx never redistributes either.
+publish them. Sevli never redistributes either.
 
 ## Bundled with the engine (`lib/`)
 
@@ -40,5 +40,5 @@ publish them. envx never redistributes either.
 
 The app's display type uses Bahnschrift from Windows itself; it is not bundled.
 
-Claude Code is a product of Anthropic; Codex is a product of OpenAI. envx works with them and is not affiliated with
+Claude Code is a product of Anthropic; Codex is a product of OpenAI. Sevli works with them and is not affiliated with
 either.

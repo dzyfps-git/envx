@@ -1,6 +1,6 @@
 # ADR 0009: Pack-update impact and headless benchmark runs
 
-Status: accepted (envx 0.6.0)
+Status: accepted (Sevli 0.6.0)
 
 ## Context
 When the pack updates, the question is never only "which mods changed" (the 0.3 diff answers that). It is "does my
@@ -27,12 +27,12 @@ switch flipped between runs, was tedious and error-prone.
    the current server, what its logs show since B's snapshot (crashes; error, warning and failed-mixin kinds first
    seen since; those involving the project).
 3. The env summary's history line says the diff includes the project's impact when run in a project.
-4. **Headless tier 2 (`bench/agents.py`).** The global switch stays OFF for the whole benchmark. ON runs add envx per
-   run through each tool's own flags: Codex `-c mcp_servers.envx.*` plus `developer_instructions`, Claude Code
-   `--mcp-config` plus `--append-system-prompt`. `envx agents bench-config <dir>` prints the MCP command and the
-   instruction block, so both come from envx itself. Each ON run's server gets `ENVX_RUN`, recorded in the call
+4. **Headless tier 2 (`bench/agents.py`).** The global switch stays OFF for the whole benchmark. ON runs add Sevli per
+   run through each tool's own flags: Codex `-c mcp_servers.sevli.*` plus `developer_instructions`, Claude Code
+   `--mcp-config` plus `--append-system-prompt`. `sevli agents bench-config <dir>` prints the MCP command and the
+   instruction block, so both come from Sevli itself. Each ON run's server gets `SEVLI_RUN`, recorded in the call
    log. Tokens come from the tools' session files; answers are graded with the keys' `answer:` facts, then by a
-   human. The harness refuses to start unless `envx agents status` reports the clean baseline.
+   human. The harness refuses to start unless `sevli agents status` reports the clean baseline.
 
 ## Consequences
 - The report runs in about 1–3 s: two mixin evaluations and up to 3000 reference checks against SQLite.
@@ -43,4 +43,4 @@ switch flipped between runs, was tedious and error-prone.
 ## Validation
 Tier 1: Q18's key was written from the project's sources, the 4.0.5 backup and the live jars; `check.py` finds all
 facts on 0.6.0 and none on 0.5.0. Tier 2 (the 0.6 milestone): `python bench/agents.py run 16 17 18`, run by the
-user with envx switched off globally.
+user with Sevli switched off globally.

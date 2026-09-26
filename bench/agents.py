@@ -1,18 +1,18 @@
 """Tier-2 benchmark, headless: paired OFF/ON agent runs with `codex exec` and `claude -p`, collected and graded.
 
-The global switch stays OFF for the whole benchmark (`envx agents off`; `envx agents status` must say
-"=> OFF (clean baseline)"), so no run sees an envx registration or instruction block by accident. An ON run adds
-envx for that run only: Codex gets `-c mcp_servers.envx...` and the instruction block as `developer_instructions`;
+The global switch stays OFF for the whole benchmark (`sevli agents off`; `sevli agents status` must say
+"=> OFF (clean baseline)"), so no run sees an sevli registration or instruction block by accident. An ON run adds
+sevli for that run only: Codex gets `-c mcp_servers.sevli...` and the instruction block as `developer_instructions`;
 Claude Code gets `--mcp-config` and the block via `--append-system-prompt`. Nothing is written to either tool's
 config. OFF runs get nothing extra. Runs alternate OFF, ON, OFF, ON per question and tool.
 
-Each run's envx server gets ENVX_RUN=<run id>, so its calls are found in envx's call log. Tokens and requests come
+Each run's sevli server gets SEVLI_RUN=<run id>, so its calls are found in sevli's call log. Tokens and requests come
 from the tool's own session files (the same parsers as extract_tokens.py). Answers are graded with the `answer:`
 facts of bench/expected/NN.md; a human confirms the grade against the key.
 
 Commands
     python bench/agents.py plan 16 18 [--tools codex,claude] [--n 2]      the runs and commands, no model calls
-    python bench/agents.py run 16 18 [--tools codex] [--n 2] [--envx 0.6.0|build]
+    python bench/agents.py run 16 18 [--tools codex] [--n 2] [--sevli 0.6.0|build]
     python bench/agents.py report [bench/results/agents-<stamp>]          table per question, tool and condition
 
 Codex always runs GPT-6 Sol at High reasoning (CODEX_MODEL, CODEX_EFFORT; passed with -c on every run and checked
@@ -39,7 +39,7 @@ import pathlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import check  # noqa: E402  (answer keys, grading, envx launcher)
+import check  # noqa: E402  (answer keys, grading, sevli launcher)
 import extract_tokens  # noqa: E402  (session parsers)
 
 ROOT = Path(__file__).resolve().parent
@@ -74,27 +74,27 @@ def claude_exe() -> str:
     return str(p) if p.exists() else "claude"
 
 
-def lib_of(envx: str | None) -> Path:
-    """The envx the ON runs use. Default: the newest installed version (a build dir changes under a running benchmark)."""
-    if envx:
-        return check.lib_dir(envx)
+def lib_of(sevli: str | None) -> Path:
+    """The sevli the ON runs use. Default: the newest installed version (a build dir changes under a running benchmark)."""
+    if sevli:
+        return check.lib_dir(sevli)
     def key(p: Path):
         return [int(x) if x.isdigit() else -1 for x in re.split(r"[.-]", p.name)]
     versions = sorted((d for d in (check.data_home() / "app").iterdir() if (d / "lib").is_dir()), key=key)
     if not versions:
-        sys.exit("no installed envx version; run setup or pass --envx build")
+        sys.exit("no installed sevli version; run setup or pass --sevli build")
     return versions[-1] / "lib"
 
 
-def envx_text(lib: Path, args: list[str], cwd: str) -> str:
-    out, _ = check.envx(lib, args, cwd)
+def sevli_text(lib: Path, args: list[str], cwd: str) -> str:
+    out, _ = check.sevli(lib, args, cwd)
     return out
 
 
 def bench_config(lib: Path, cwd: str) -> dict:
-    out = envx_text(lib, ["agents", "bench-config", cwd], cwd)
+    out = sevli_text(lib, ["agents", "bench-config", cwd], cwd)
     if "{" not in out:
-        sys.exit(f"envx in {lib} cannot print a bench config (0.6.0 or later needed): {out[:200]}")
+        sys.exit(f"sevli in {lib} cannot print a bench config (0.6.0 or later needed): {out[:200]}")
     return json.loads(out[out.index("{"):])
 
 
@@ -108,19 +108,19 @@ def command(tool: str, cond: str, run_id: str, question: str, cwd: str, cfg: dic
                "-c", "model=" + toml_str(CODEX_MODEL), "-c", "model_reasoning_effort=" + toml_str(CODEX_EFFORT)]
         if cond == "on":
             c = cfg["command"]
-            cmd += ["-c", "mcp_servers.envx.command=" + toml_str(c[0]),
-                    "-c", "mcp_servers.envx.args=[" + ", ".join(toml_str(a) for a in c[1:]) + "]",
-                    "-c", "mcp_servers.envx.enabled=true", "-c", "mcp_servers.envx.startup_timeout_sec=30",
-                    "-c", "mcp_servers.envx.env={ ENVX_RUN = " + toml_str(run_id) + " }",
+            cmd += ["-c", "mcp_servers.sevli.command=" + toml_str(c[0]),
+                    "-c", "mcp_servers.sevli.args=[" + ", ".join(toml_str(a) for a in c[1:]) + "]",
+                    "-c", "mcp_servers.sevli.enabled=true", "-c", "mcp_servers.sevli.startup_timeout_sec=30",
+                    "-c", "mcp_servers.sevli.env={ SEVLI_RUN = " + toml_str(run_id) + " }",
                     "-c", "developer_instructions=" + toml_str(cfg["instructions"])]
         else:
-            cmd += ["-c", "mcp_servers.envx.enabled=false"]
+            cmd += ["-c", "mcp_servers.sevli.enabled=false"]
         return cmd + [question]
     cmd = [claude_exe(), "-p", question, "--output-format", "json", "--session-id", session,
            "--permission-mode", "auto", "--permission-prompts", "none"]
     if cond == "on":
         c = cfg["command"]
-        mcp = {"mcpServers": {"envx": {"command": c[0], "args": c[1:], "env": {"ENVX_RUN": run_id}}}}
+        mcp = {"mcpServers": {"sevli": {"command": c[0], "args": c[1:], "env": {"SEVLI_RUN": run_id}}}}
         cmd += ["--mcp-config", json.dumps(mcp), "--append-system-prompt", cfg["instructions"]]
     return cmd
 
@@ -139,7 +139,7 @@ def plan(a) -> list[tuple[str, str, str, int]]:
 
 
 def cmd_plan(a) -> None:
-    lib = lib_of(a.envx)
+    lib = lib_of(a.sevli)
     qs = questions()
     for q, tool, cond, i in plan(a):
         question, cwd = qs[q]
@@ -151,18 +151,18 @@ def cmd_plan(a) -> None:
 
 
 def baseline_ok(lib: Path) -> bool:
-    out = envx_text(lib, ["agents", "status"], str(ROOT))
+    out = sevli_text(lib, ["agents", "status"], str(ROOT))
     if "=> OFF (clean baseline)" in out:
         return True
     print(out)
-    print("\nHeadless runs need the clean baseline: run `envx agents off` for the benchmark (and `envx agents on` after).")
-    print("ON runs add envx per run; nothing else is changed.")
+    print("\nHeadless runs need the clean baseline: run `sevli agents off` for the benchmark (and `sevli agents on` after).")
+    print("ON runs add sevli per run; nothing else is changed.")
     return False
 
 
-# Instructions every session of that tool loads, whatever its working folder. `envx agents off` does not manage them
-# (they are the owner's), so a mention of envx there reaches OFF runs: on 2026-09-25 an advisory section in the global
-# Codex AGENTS.md led a Q4 OFF run to find and call envx through the shell.
+# Instructions every session of that tool loads, whatever its working folder. `sevli agents off` does not manage them
+# (they are the owner's), so a mention of sevli there reaches OFF runs: on 2026-09-25 an advisory section in the global
+# Codex AGENTS.md led a Q4 OFF run to find and call sevli through the shell.
 GLOBAL_INSTRUCTIONS = {"codex": [HOME / ".codex/AGENTS.md"], "claude": [HOME / ".claude/CLAUDE.md"]}
 
 
@@ -174,15 +174,15 @@ def global_ok(tools: list[str]) -> bool:
                 lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
             except OSError:
                 continue
-            hits = [i + 1 for i, line in enumerate(lines) if re.search(r"envx", line, re.I)]
+            hits = [i + 1 for i, line in enumerate(lines) if re.search(r"sevli", line, re.I)]
             if hits:
-                found.append(f"{f} mentions envx on line(s) {', '.join(map(str, hits[:12]))}{' ...' if len(hits) > 12 else ''}")
+                found.append(f"{f} mentions sevli on line(s) {', '.join(map(str, hits[:12]))}{' ...' if len(hits) > 12 else ''}")
     if not found:
         return True
     print("\n".join(found))
     print("\nThese global instructions load into every session of that tool, including OFF runs, and would tell the agent")
-    print("about envx. Move that text out for OFF runs and put it back afterwards (the harness never edits them), or pass")
-    print("--allow-global-mention to accept the risk (an OFF run that then uses envx is marked contaminated and wasted).")
+    print("about sevli. Move that text out for OFF runs and put it back afterwards (the harness never edits them), or pass")
+    print("--allow-global-mention to accept the risk (an OFF run that then uses sevli is marked contaminated and wasted).")
     return False
 
 
@@ -247,19 +247,19 @@ def run_one(a, lib: Path, out_dir: Path, q: str, tool: str, cond: str, i: int) -
     spec = check.keys([q]).get(q)
     facts = spec["answer"] if spec else []
     hits = [f for f in facts if check.found(f, text)]
-    calls = envx_calls(run_id, start)
+    calls = sevli_calls(run_id, start)
     rec = {"run": run_id, "q": q, "tool": tool, "cond": cond, "i": i, "exit": code, "secs": secs, "error": error,
            "facts": len(facts), "facts_stated": len(hits), "missing": [f for f in facts if f not in hits],
-           "envx_calls": len(calls), "envx_chars": sum(c.get("chars", 0) for c in calls),
+           "sevli_calls": len(calls), "sevli_chars": sum(c.get("chars", 0) for c in calls),
            **({k: v for k, v in metrics.items() if not k.startswith("_")} if metrics else {"total_tokens": None})}
-    if cond == "off" and not rec["error"] and max(len(calls), rec.get("envx_calls") or 0) > 0:
-        rec["error"] = f"contaminated: the OFF run used envx ({max(len(calls), rec.get('envx_calls') or 0)} call(s))"
+    if cond == "off" and not rec["error"] and max(len(calls), rec.get("sevli_calls") or 0) > 0:
+        rec["error"] = f"contaminated: the OFF run used sevli ({max(len(calls), rec.get('sevli_calls') or 0)} call(s))"
     with (out_dir / "runs.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(rec) + "\n")
     return rec
 
 
-def envx_calls(run_id: str, since: dt.datetime) -> list[dict]:
+def sevli_calls(run_id: str, since: dt.datetime) -> list[dict]:
     out = []
     for f in sorted((check.data_home() / "logs").glob("calls-*.jsonl")):
         for line in f.open(encoding="utf-8"):
@@ -271,15 +271,15 @@ def envx_calls(run_id: str, since: dt.datetime) -> list[dict]:
 
 
 def cmd_run(a) -> None:
-    lib = lib_of(a.envx)
-    # Only OFF runs are harmed by a mention of envx (ON runs have envx anyway); --allow-global-mention accepts the risk,
-    # and an OFF run that then uses envx is still marked contaminated.
+    lib = lib_of(a.sevli)
+    # Only OFF runs are harmed by a mention of sevli (ON runs have sevli anyway); --allow-global-mention accepts the risk,
+    # and an OFF run that then uses sevli is still marked contaminated.
     offs = "off" in a.conds.split(",")
     if not baseline_ok(lib) or (offs and not a.allow_global_mention and not global_ok(a.tools.split(","))):
         sys.exit(2)
     out_dir = ROOT / "results" / ("agents-" + dt.datetime.now().strftime("%Y%m%d-%H%M%S"))
     out_dir.mkdir(parents=True)
-    (out_dir / "meta.json").write_text(json.dumps({"envx": check.version_of(lib), "questions": a.questions, "tools": a.tools,
+    (out_dir / "meta.json").write_text(json.dumps({"sevli": check.version_of(lib), "questions": a.questions, "tools": a.tools,
                                                    "codex": f"{CODEX_MODEL} {CODEX_EFFORT}", "claude": "default effort",
                                                    "n": a.n, "started": dt.datetime.now().isoformat(timespec="seconds")}), encoding="utf-8")
     runs = plan(a)
@@ -296,7 +296,7 @@ def cmd_run(a) -> None:
             continue
         facts = f"{r['facts_stated']}/{r['facts']}" if r["facts"] else "no key"
         print(f"    {r['secs']} s, {r.get('total_tokens')} tokens, {r.get('requests')} requests, "
-              f"{r['envx_calls']} envx calls, facts {facts}", flush=True)
+              f"{r['sevli_calls']} sevli calls, facts {facts}", flush=True)
     for tool, err in stopped.items():
         print(f"{tool}: stopped after a failed run ({err[:200]})")
     print(f"saved {out_dir.relative_to(ROOT.parent)}")
@@ -309,8 +309,8 @@ def comparable(r: dict) -> bool:
 
 
 def baseline_rows(path: str) -> list[dict]:
-    """OFF runs recorded earlier, reused as baselines (OFF does not depend on envx): a results folder (its OFF runs
-    only) or an extract_tokens.py CSV (runs without envx calls, matched to questions by their prompt)."""
+    """OFF runs recorded earlier, reused as baselines (OFF does not depend on sevli): a results folder (its OFF runs
+    only) or an extract_tokens.py CSV (runs without sevli calls, matched to questions by their prompt)."""
     if pathlib.Path(path).is_dir():
         return [dict(r, run="baseline:" + r["run"]) for r in graded(pathlib.Path(path)) if r.get("cond") == "off"]
     import csv
@@ -318,7 +318,7 @@ def baseline_rows(path: str) -> list[dict]:
     prompts = {q: " ".join(text.split()).lower()[:60] for q, (text, _) in questions().items()}
     rows = []
     for r in csv.DictReader(open(csv_path, encoding="utf-8")):
-        if str(r.get("envx_calls", "0")) not in ("0", ""):
+        if str(r.get("sevli_calls", "0")) not in ("0", ""):
             continue
         p = " ".join((r.get("prompt") or "").split()).lower()
         q = next((k for k, v in prompts.items() if p[:40] and v.startswith(p[:40])), None)
@@ -327,19 +327,19 @@ def baseline_rows(path: str) -> list[dict]:
         rows.append({"run": f"baseline:{pathlib.Path(csv_path).name}:{r.get('start')}", "q": q, "tool": r["tool"], "cond": "off",
                      "exit": 0, "facts": 0, "facts_stated": 0, "model": r.get("model"), "effort": r.get("effort"),
                      "secs": int(r["span_s"]) if str(r.get("span_s", "")).isdigit() else None,
-                     **{k: int(r[k]) for k in ("total_tokens", "uncached_in", "requests", "shell_calls", "envx_calls") if str(r.get(k, "")).isdigit()}})
+                     **{k: int(r[k]) for k in ("total_tokens", "uncached_in", "requests", "shell_calls", "sevli_calls") if str(r.get(k, "")).isdigit()}})
     return rows
 
 
 def graded(d: Path) -> list[dict]:
     out = []
     try:
-        envx = json.loads((d / "meta.json").read_text(encoding="utf-8")).get("envx")
+        sevli = json.loads((d / "meta.json").read_text(encoding="utf-8")).get("sevli")
     except (OSError, ValueError):
-        envx = None
+        sevli = None
     for l in (d / "runs.jsonl").open(encoding="utf-8"):
         r = json.loads(l)
-        r.setdefault("envx", envx)
+        r.setdefault("sevli", sevli)
         answer = d / f"{r['run']}.answer.txt"
         spec = check.keys([r["q"]]).get(r["q"])
         if spec and answer.exists():  # grade saved answers with the current keys (keys get fixed after runs)
@@ -355,14 +355,14 @@ def report(dirs: list[Path], baselines: list[str]) -> None:
     for b in baselines:
         all_rows += baseline_rows(b)
     for r in all_rows:  # runs recorded before the harness checked this
-        if r.get("cond") == "off" and not r.get("error") and (r.get("envx_calls") or 0) > 0:
-            r["error"] = f"contaminated: the OFF run used envx ({r['envx_calls']} call(s))"
+        if r.get("cond") == "off" and not r.get("error") and (r.get("sevli_calls") or 0) > 0:
+            r["error"] = f"contaminated: the OFF run used sevli ({r['sevli_calls']} call(s))"
     ok = [r for r in all_rows if not r.get("error") and r.get("exit") == 0 and r.get("total_tokens")]
     rows = [r for r in ok if comparable(r)]
-    # A weak spot fixed and rerun supersedes the runs on older envx: each ON cell counts only its newest envx version
-    # (OFF runs do not depend on envx).
+    # A weak spot fixed and rerun supersedes the runs on older sevli: each ON cell counts only its newest sevli version
+    # (OFF runs do not depend on sevli).
     def ver(r):
-        return [int(x) if x.isdigit() else -1 for x in re.split(r"[.-]", r.get("envx") or "0")]
+        return [int(x) if x.isdigit() else -1 for x in re.split(r"[.-]", r.get("sevli") or "0")]
     newest = {}
     for r in rows:
         if r["cond"] == "on":
@@ -382,12 +382,12 @@ def report(dirs: list[Path], baselines: list[str]) -> None:
     def fmt(x, pct=False):
         return "-" if x is None else f"{x:,.0f}"
 
-    print("| Q | tool | cond | n | facts stated | total tokens | uncached in | requests | shell calls | envx calls | wall s |")
+    print("| Q | tool | cond | n | facts stated | total tokens | uncached in | requests | shell calls | sevli calls | wall s |")
     print("|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     for (q, tool, cond), rs in sorted(cells.items(), key=lambda x: (int(x[0][0]), x[0][1], x[0][2] != "off")):
         facts = f"{mean(rs, 'facts_stated'):.1f}/{rs[0]['facts']}" if rs[0]["facts"] else "no key"
         print(f"| {q} | {tool} | {cond} | {len(rs)} | {facts} | {fmt(mean(rs, 'total_tokens'))} | {fmt(mean(rs, 'uncached_in'))} | "
-              f"{fmt(mean(rs, 'requests'))} | {fmt(mean(rs, 'shell_calls'))} | {fmt(mean(rs, 'envx_calls'))} | {fmt(mean(rs, 'secs'))} |")
+              f"{fmt(mean(rs, 'requests'))} | {fmt(mean(rs, 'shell_calls'))} | {fmt(mean(rs, 'sevli_calls'))} | {fmt(mean(rs, 'secs'))} |")
     print("\nON vs OFF (mean total tokens):")
     for (q, tool, cond), rs in sorted(cells.items()):
         if cond != "on" or (q, tool, "off") not in cells:
@@ -420,8 +420,8 @@ def report(dirs: list[Path], baselines: list[str]) -> None:
     models = collections.Counter(f"{r['tool']} {r.get('model') or '?'} {r.get('effort') or ''}".strip() for r in rows)
     print("\nmodels: " + ", ".join(f"{k} x{v}" for k, v in models.items()) + " (keep one setting per tool across a benchmark)")
     if superseded:
-        print("superseded (an ON run on a newer envx exists for the same question and tool): "
-              + ", ".join(f"{r['run']} ({r.get('envx')})" for r in superseded))
+        print("superseded (an ON run on a newer sevli exists for the same question and tool): "
+              + ", ".join(f"{r['run']} ({r.get('sevli')})" for r in superseded))
     if other:
         print(f"not equivalent, outside the table (Codex measures only at {CODEX_MODEL} {CODEX_EFFORT}): "
               + ", ".join(f"{k} x{v}" for k, v in other.items()))
@@ -440,15 +440,15 @@ def main() -> None:
         p.add_argument("--tools", default="codex,claude")
         p.add_argument("--n", type=int, default=1, help="rounds per question and tool (add repeats only where needed)")
         p.add_argument("--conds", default="off,on", help="off,on (default) or on: reuse existing OFF baselines")
-        p.add_argument("--envx", default=None, help="an installed version (default: the newest), build, or a lib dir")
+        p.add_argument("--sevli", default=None, help="an installed version (default: the newest), build, or a lib dir")
         p.add_argument("--timeout", type=int, default=2400, help="seconds per run")
         p.add_argument("--allow-global-mention", action="store_true",
-                       help="run OFF runs although global instructions mention envx (risk: contaminated, wasted runs)")
+                       help="run OFF runs although global instructions mention sevli (risk: contaminated, wasted runs)")
         p.set_defaults(fn=fn)
     p = sub.add_parser("report")
     p.add_argument("dirs", nargs="*", help="result folders to combine (stages); default: the newest")
     p.add_argument("--baseline", action="append", default=[],
-                   help="results folder (its OFF runs) or extract_tokens.py CSV (runs without envx calls) "
+                   help="results folder (its OFF runs) or extract_tokens.py CSV (runs without sevli calls) "
                         "reused as OFF baselines (repeatable)")
     p.set_defaults(fn=lambda a: report([Path(d) for d in a.dirs] or [sorted((ROOT / "results").glob("agents-*"))[-1]], a.baseline))
     a = ap.parse_args()

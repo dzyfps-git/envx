@@ -1,6 +1,6 @@
 # ADR 0008: Runtime evidence from server logs and crash reports
 
-Status: accepted (envx 0.5.0)
+Status: accepted (Sevli 0.5.0)
 
 ## Context
 The index says what mods *declare*. What actually happens on the server is in its logs and crash reports.
@@ -11,7 +11,7 @@ logger name, so the owning mod is not visible. Crash reports are already Yarn-na
 StackDeobfuscator) but name today's mods, not the versions that crashed.
 
 Spark accounted for even more agent output (707 commands, ~14M characters), but a separate Spark analyzer already
-archives and attributes profiles. Spark stays out of envx (see Next).
+archives and attributes profiles. Spark stays out of Sevli (see Next).
 
 ## Decisions
 1. **A local log mirror, not snapshot content.** `envs/<env>/runtime/` holds `logs/latest.log`, rotated
@@ -48,7 +48,7 @@ two watchdog crashes with different culprits merged because both stacks start in
 key on the first mod frame).
 
 ## Next
-- Spark: not in envx. Profile analysis belongs to a separate tool, and a batch frame-resolution interface
+- Spark: not in Sevli. Profile analysis belongs to a separate tool, and a batch frame-resolution interface
   would serve only that one consumer. Revisit if several projects need the same resolver. Single frames already
   resolve through `find` (intermediary or Yarn, with owning mod).
 - Applied mixins beyond failures (e.g. Mixin's audit output) only if agents need it.

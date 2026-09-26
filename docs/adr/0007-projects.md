@@ -1,6 +1,6 @@
 # ADR 0007: Projects — does my mod fit this environment?
 
-Status: accepted (envx 0.4.0)
+Status: accepted (Sevli 0.4.0)
 
 ## Context
 The baseline and environment layers are strong; the project layer was only `check_mixins` on a built jar. A survey
@@ -22,7 +22,7 @@ Several build against Loader 0.16.10 while the server runs 0.19.3.
    when `src/main` changed after it was built.
 4. **Surface: the `env` summary**, when the cwd is in a project, adds a short section. No new tool or parameter.
    - Build settings vs what the server runs: Minecraft, Loader, Fabric API and Java from the loader log. Yarn is
-     compared with envx's mappings, and Loom/Gradle are listed.
+     compared with Sevli's mappings, and Loom/Gradle are listed.
    - Whether this build is deployed (same jar, same version with a different jar, another version, or not
      deployed, with the past versions that had it).
    - Declared dependencies checked against the server with Fabric-style version ranges.
@@ -42,7 +42,7 @@ Several build against Loader 0.16.10 while the server runs 0.19.3.
    Automatic overlay inside project folders was rejected: most questions asked from a project folder are
    about the server, and a silently swapped jar would make those answers wrong.
 6. **A build is indexed by a separate process.** Query and MCP processes stay read-only (ADR 0002): the first
-   `project:` query on a new build runs `envx project index` and waits for it (about 3 s for a small mod,
+   `project:` query on a new build runs `sevli project index` and waits for it (about 3 s for a small mod,
    mostly loading mappings). The jar is content-addressed like any mod jar, so an unchanged build is never
    indexed twice and a build identical to the deployed jar is the same artifact.
 7. **Builds are not history.** They belong to no snapshot. The newest 3 unreferenced builds per mod id are kept

@@ -12,7 +12,7 @@ interface Pending {
 }
 
 /**
- * The envx engine, running as `envx app-server` (JSON lines on stdin/stdout; ADR 0013). The installed app carries its
+ * The sevli engine, running as `sevli app-server` (JSON lines on stdin/stdout; ADR 0013). The installed app carries its
  * own Java runtime and the engine jars in its resources; a development run uses the engine built in ../engine.
  */
 export class Engine {
@@ -33,10 +33,10 @@ export class Engine {
   start(): void {
     const { java, classpath } = locate();
     if (java !== "java" && !existsSync(java)) {
-      this.setState({ running: false, message: `The bundled Java runtime is missing (${java}). Reinstall envx.` });
+      this.setState({ running: false, message: `The bundled Java runtime is missing (${java}). Reinstall Sevli.` });
       return;
     }
-    this.proc = spawn(java, ["-Xss4m", "-XX:+UseSerialGC", "-cp", classpath, "dev.envx.cli.Main", "app-server"], {
+    this.proc = spawn(java, ["-Xss4m", "-XX:+UseSerialGC", "-cp", classpath, "dev.sevli.cli.Main", "app-server"], {
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -101,9 +101,9 @@ function locate(): { java: string; classpath: string } {
     const res = process.resourcesPath;
     return { java: path.join(res, "runtime", "bin", exe), classpath: path.join(res, "engine", "lib", "*") };
   }
-  const javaHome = process.env.ENVX_JAVA_HOME ?? process.env.JAVA_HOME;
+  const javaHome = process.env.SEVLI_JAVA_HOME ?? process.env.JAVA_HOME;
   return {
     java: javaHome ? path.join(javaHome, "bin", exe) : "java",
-    classpath: path.join(app.getAppPath(), "..", "engine", "build", "install", "envx", "lib", "*"),
+    classpath: path.join(app.getAppPath(), "..", "engine", "build", "install", "sevli", "lib", "*"),
   };
 }

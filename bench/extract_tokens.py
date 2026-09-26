@@ -2,7 +2,7 @@
 
 Codex:       ~/.codex/state_5.sqlite (thread list) + each thread's rollout .jsonl
 Claude Code: ~/.claude/projects/*/*.jsonl transcripts
-envx:        <ENVX_HOME>/logs/calls-*.jsonl (with --envx-log)
+sevli:        <SEVLI_HOME>/logs/calls-*.jsonl (with --sevli-log)
 
 At Extra High reasoning the cost of a run is roughly (model requests) x (context size), so the
 report shows requests next to tokens. Archive benchmark threads instead of deleting them, or
@@ -11,7 +11,7 @@ extract before deleting: a deleted Codex thread takes its token data with it.
 Examples:
   python bench/extract_tokens.py --since 2026-09-24 --match "ServerChunkManager.tick"
   python bench/extract_tokens.py --since 2026-09-24T18:00 --tool codex --csv bench/results/runs.csv
-  python bench/extract_tokens.py --since 2026-09-24 --envx-log
+  python bench/extract_tokens.py --since 2026-09-24 --sevli-log
 """
 from __future__ import annotations
 
@@ -41,13 +41,13 @@ def ts(value) -> dt.datetime | None:
         return None
 
 
-def row(tool, start, end, cwd, prompt, model, effort, total, uncached, cached, output, requests, envx, envx_chars, shell, other):
+def row(tool, start, end, cwd, prompt, model, effort, total, uncached, cached, output, requests, sevli, sevli_chars, shell, other):
     return {
         "tool": tool, "start": start.astimezone().strftime("%Y-%m-%d %H:%M") if start else "",
         "span_s": int((end - start).total_seconds()) if start and end else "",
         "cwd": cwd or "", "prompt": " ".join((prompt or "").split())[:70], "model": model or "", "effort": effort or "",
         "total_tokens": total, "uncached_in": uncached, "cached_in": cached, "output": output, "requests": requests,
-        "envx_calls": envx, "envx_chars": envx_chars, "shell_calls": shell, "other_tools": other,
+        "sevli_calls": sevli, "sevli_chars": sevli_chars, "shell_calls": shell, "other_tools": other,
         "tool_lookups": 0,
     }
 
@@ -72,7 +72,7 @@ def codex_sessions(since, until):
 def codex_rollout(path: Path, cwd, model, effort, first, start):
     total = None
     requests = records = 0
-    envx = envx_chars = shell = other = lookups = 0
+    sevli = sevli_chars = shell = other = lookups = 0
     end = start
     with path.open(encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -94,16 +94,16 @@ def codex_rollout(path: Path, cwd, model, effort, first, start):
                 it = p.get("item") or {}
                 t = it.get("type")
                 if t == "McpToolCall":
-                    if it.get("server") == "envx":
-                        envx += 1
-                        envx_chars += len(json.dumps(it.get("result") or ""))
+                    if it.get("server") == "sevli":
+                        sevli += 1
+                        sevli_chars += len(json.dumps(it.get("result") or ""))
                     else:
                         other += 1
                 elif t == "CommandExecution":
                     cmd = json.dumps(it.get("command"))
-                    if "envx.cmd" in cmd or "envx.bat" in cmd:
-                        envx += 1
-                        envx_chars += len(it.get("aggregated_output") or "")
+                    if "sevli.cmd" in cmd or "sevli.bat" in cmd:
+                        sevli += 1
+                        sevli_chars += len(it.get("aggregated_output") or "")
                     else:
                         shell += 1
                 elif t in ("DynamicToolCall", "WebSearch", "FileChange"):
@@ -113,7 +113,7 @@ def codex_rollout(path: Path, cwd, model, effort, first, start):
     cached = total.get("cached_input_tokens", 0)
     r = row("codex", start, end, cwd, first, model, effort, total.get("total_tokens", 0),
                total.get("input_tokens", 0) - cached, cached, total.get("output_tokens", 0),
-               records or requests, envx, envx_chars, shell, other)
+               records or requests, sevli, sevli_chars, shell, other)
     r["tool_lookups"] = lookups
     return r
 
@@ -137,8 +137,8 @@ def claude_transcript(f: Path):
     tool_ids = {}
     first = cwd = model = None
     start = end = None
-    envx_chars = 0
-    envx_ids = set()
+    sevli_chars = 0
+    sevli_ids = set()
     with f.open(encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -158,8 +158,8 @@ def claude_transcript(f: Path):
                     first = text
             if o.get("type") == "user" and isinstance(msg.get("content"), list):
                 for b in msg["content"]:
-                    if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("tool_use_id") in envx_ids:
-                        envx_chars += len(json.dumps(b.get("content")))
+                    if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("tool_use_id") in sevli_ids:
+                        sevli_chars += len(json.dumps(b.get("content")))
             if o.get("type") == "assistant":
                 model = msg.get("model") or model
                 if msg.get("id") and msg.get("usage"):
@@ -168,9 +168,9 @@ def claude_transcript(f: Path):
                     if isinstance(b, dict) and b.get("type") == "tool_use":
                         name = b.get("name", "")
                         inp = json.dumps(b.get("input"))
-                        if name.startswith("mcp__envx__") or (name in ("Bash", "PowerShell") and "envx.cmd" in inp):
-                            kind = "envx"
-                            envx_ids.add(b.get("id"))
+                        if name.startswith("mcp__sevli__") or (name in ("Bash", "PowerShell") and "sevli.cmd" in inp):
+                            kind = "sevli"
+                            sevli_ids.add(b.get("id"))
                         elif name in ("Bash", "PowerShell"):
                             kind = "shell"
                         else:
@@ -185,18 +185,18 @@ def claude_transcript(f: Path):
     kinds = collections.Counter(tool_ids.values())
     total = sum(u.values())
     r = row("claude", start, end, cwd, first, model, "", total, u["input_tokens"] + u["cache_creation_input_tokens"],
-            u["cache_read_input_tokens"], u["output_tokens"], len(usage_by_msg), kinds["envx"], envx_chars, kinds["shell"], kinds["other"])
+            u["cache_read_input_tokens"], u["output_tokens"], len(usage_by_msg), kinds["sevli"], sevli_chars, kinds["shell"], kinds["other"])
     r["_start"] = start
     return r
 
 
-# ---------------------------------------------------------------- envx call log
+# ---------------------------------------------------------------- sevli call log
 
-CAPPED_CHARS = 5800  # answers this long hit (or nearly hit) envx's default 6000-char cap
+CAPPED_CHARS = 5800  # answers this long hit (or nearly hit) sevli's default 6000-char cap
 
 
-def envx_log(since, until):
-    from check import data_home  # same resolution as envx itself
+def sevli_log(since, until):
+    from check import data_home  # same resolution as sevli itself
     home = data_home()
     sessions = collections.defaultdict(list)
     for f in sorted((home / "logs").glob("calls-*.jsonl")):
@@ -209,7 +209,7 @@ def envx_log(since, until):
             if (since and t and t < since) or (until and t and t > until):
                 continue
             sessions[o.get("session")].append(o)
-    print("\n## envx call log\n")
+    print("\n## sevli call log\n")
     print("| session | via | cwd | calls | by tool | answer chars | repeated identical calls | repeated answers | capped answers | errors |")
     print("|---|---|---|---:|---|---:|---:|---:|---:|---:|")
     for sid, calls in sessions.items():
@@ -235,7 +235,7 @@ def main():
     ap.add_argument("--cwd", help="substring of the working directory")
     ap.add_argument("--tool", choices=["codex", "claude", "both"], default="both")
     ap.add_argument("--csv", help="also write rows to this CSV file")
-    ap.add_argument("--envx-log", action="store_true", help="also summarize envx's own call log")
+    ap.add_argument("--sevli-log", action="store_true", help="also summarize sevli's own call log")
     a = ap.parse_args()
     since, until = parse_time(a.since), parse_time(a.until)
 
@@ -250,7 +250,7 @@ def main():
         rows = [r for r in rows if a.cwd.lower() in r["cwd"].lower()]
     rows.sort(key=lambda r: r["start"])
 
-    cols = ["tool", "start", "span_s", "prompt", "total_tokens", "uncached_in", "output", "requests", "envx_calls", "shell_calls", "other_tools", "tool_lookups"]
+    cols = ["tool", "start", "span_s", "prompt", "total_tokens", "uncached_in", "output", "requests", "sevli_calls", "shell_calls", "other_tools", "tool_lookups"]
     print("| " + " | ".join(cols) + " |")
     print("|" + "---|" * len(cols))
     for r in rows:
@@ -263,8 +263,8 @@ def main():
             w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()) if rows else ["tool"])
             w.writeheader()
             w.writerows(rows)
-    if a.envx_log:
-        envx_log(since, until)
+    if a.sevli_log:
+        sevli_log(since, until)
 
 
 if __name__ == "__main__":

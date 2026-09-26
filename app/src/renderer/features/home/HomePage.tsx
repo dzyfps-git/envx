@@ -1,5 +1,5 @@
 import type { AppData, PageId } from "../../App";
-import { ago, envx, size } from "../../api";
+import { ago, sevli, size } from "../../api";
 import { Core } from "../../ui/Core";
 import { Icon, IconName } from "../../ui/Icon";
 import { Sparkline } from "../../ui/Sparkline";
@@ -10,7 +10,7 @@ const INSTALL: Record<string, string> = {
   codex: "https://developers.openai.com/codex",
 };
 
-/** The core screen: the agent in focus, what envx holds for it, and what to do next. */
+/** The core screen: the agent in focus, what sevli holds for it, and what to do next. */
 export function HomePage({ data }: { data: AppData }) {
   const s = data.status;
   const a = data.agent;
@@ -19,7 +19,7 @@ export function HomePage({ data }: { data: AppData }) {
   const baselines = s?.baselines ?? [];
   const installed = baselines.filter((b) => b.installed);
   const firstBaseline = baselines.find((b) => !b.installed && b.supported);
-  const calls = sum(act?.envxCalls);
+  const calls = sum(act?.sevliCalls);
   const sessions = sum(act?.sessions);
   const done = envs.reduce((n, e) => n + (e.sourceJarsDone ?? 0), 0);
   const total = envs.reduce((n, e) => n + (e.sourceJarsTotal ?? 0), 0);
@@ -35,19 +35,19 @@ export function HomePage({ data }: { data: AppData }) {
           {a?.installed ? (
             <div className="chips">
               <span className="chip">{modelLabel(a.model ?? act?.lastModel)}</span>
-              <span className={"chip" + (a.envx ? " live" : " off")}>envx {a.envx ? "on" : "off"}</span>
+              <span className={"chip" + (a.sevli ? " live" : " off")}>Sevli {a.sevli ? "on" : "off"}</span>
               <span className="chip">{a.instructionFiles} instruction {a.instructionFiles === 1 ? "file" : "files"}</span>
             </div>
           ) : (
             <div className="hero-note">
-              {a?.name ?? "This agent"} isn't on this PC yet. Install it, sign in in its own app, and envx will show up here.
-              <div><button className="glow-btn" onClick={() => a && void envx.openExternal(INSTALL[a.id])}>Get {a?.name}</button></div>
+              {a?.name ?? "This agent"} isn't on this PC yet. Install it, sign in in its own app, and sevli will show up here.
+              <div><button className="glow-btn" onClick={() => a && void sevli.openExternal(INSTALL[a.id])}>Get {a?.name}</button></div>
             </div>
           )}
           <p className="hero-line">
             {installed.length === 0
-              ? "Nothing is indexed yet. Pick a baseline and envx builds its index on this PC; your agents can then look up Minecraft code instead of decompiling it."
-              : `${a?.name ?? "Your agent"} can look up ${installed.map((b) => b.name).join(", ")}${envs.length ? ` and ${envs.length} ${envs.length === 1 ? "environment" : "environments"}` : ""} through envx.`}
+              ? "Nothing is indexed yet. Pick a baseline and Sevli builds its index on this PC; your agents can then look up Minecraft code instead of decompiling it."
+              : `${a?.name ?? "Your agent"} can look up ${installed.map((b) => b.name).join(", ")}${envs.length ? ` and ${envs.length} ${envs.length === 1 ? "environment" : "environments"}` : ""} through Sevli.`}
           </p>
         </div>
         <Core effort={a?.effort} present={!!a?.installed} />
@@ -57,7 +57,7 @@ export function HomePage({ data }: { data: AppData }) {
         <div className="glass panel-hud">
           <div className="cap">Link status</div>
           <Row k="Installed" v={a?.installed ? "Yes" : "Not found"} tone={a?.installed ? "ok" : "bad"} />
-          <Row k="envx" v={!a?.registered ? "Not set up" : a.envx ? "On" : "Off"} tone={a?.envx ? "ok" : "warn"} />
+          <Row k="Sevli" v={!a?.registered ? "Not set up" : a.sevli ? "On" : "Off"} tone={a?.sevli ? "ok" : "warn"} />
           <Row k="Projects" v={a ? `${a.projects} linked` : "—"} />
           <Row k="Last session" v={act?.lastSession ? ago(act.lastSession) : "none in 14 days"} />
           <button className="line-btn" onClick={() => data.go("agents")}>Manage agents <Icon name="chevron" /></button>
@@ -67,12 +67,12 @@ export function HomePage({ data }: { data: AppData }) {
           <Action icon="ledger" t={firstBaseline ? `Download ${firstBaseline.minecraft ?? ""} ${firstBaseline.loader ? firstBaseline.loader[0].toUpperCase() + firstBaseline.loader.slice(1) : firstBaseline.name}`.replace(/\s+/g, " ") : "Baselines"} s={firstBaseline ? `${size(firstBaseline.downloadBytes)} download` : `${installed.length} installed`} page="baselines" go={data.go} primary={installed.length === 0} />
           <Action icon="findings" t="Add a modpack" s={`${packs} installed`} page="packs" go={data.go} />
           <Action icon="servers" t="Connect a server" s="optional" page="servers" go={data.go} />
-          <Action icon="reports" t="Insights" s="how agents used envx" page="insights" go={data.go} />
+          <Action icon="reports" t="Insights" s="how agents used Sevli" page="insights" go={data.go} />
         </div>
       </aside>
 
       <section className="vitals">
-        <Vital label="envx calls" note="last 14 days" value={data.activity ? String(calls) : "…"} spark={act?.envxCalls} />
+        <Vital label="Sevli calls" note="last 14 days" value={data.activity ? String(calls) : "…"} spark={act?.sevliCalls} />
         <Vital label="Sessions" note={`${a?.name ?? "agent"}, last 14 days`} value={data.activity ? String(sessions) : "…"} spark={act?.sessions} />
         <Vital label="Environments" note={freshest ? `checked ${ago(freshest)}` : "none yet"} value={String(envs.length)}
           bar={envs.length ? 1 : 0} />

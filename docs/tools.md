@@ -1,6 +1,6 @@
-# envx tools and query syntax (the 1.0 contract)
+# Sevli tools and query syntax (the 1.0 contract)
 
-Agents reach envx through eight MCP tools; the CLI has the same queries (`envx <tool> ...`, `env` is `envx env-info`).
+Agents reach Sevli through eight MCP tools; the CLI has the same queries (`sevli <tool> ...`, `env` is `sevli info`).
 Names, parameters and descriptions are snapshotted in `engine/src/test/resources/tool-contract.txt`; changing them is a
 deliberate, reviewed change. Every answer is size-capped (6000 characters by default, `--budget` on the CLI) and
 says what it left out and how to narrow.
@@ -21,7 +21,7 @@ Answers show Yarn first and the runtime name in brackets.
 | `project:` or `project:<id>` | In a mod project folder: use its built jar in place of the server's copy of the same mod. The answer starts with a `[with project build ...]` line. |
 
 ## Environments and history (`env` parameter on every tool)
-- Default: the environment linked to the working directory (`envx link`), else the default one.
+- Default: the environment linked to the working directory (`sevli link`), else the default one.
 - `name@<label>` (for example `myserver@4.0.5`) queries a past snapshot; such answers start with a `[... past snapshot ...]`
   line. `name@current` is the live one. Server logs exist only for the current snapshot.
 
@@ -38,6 +38,6 @@ Answers show Yarn first and the runtime name in brackets.
 | `grep` | `pattern`: a case-insensitive Java regex (in JSON files a match also shows its whole small object or array, lines marked `N-`; since 0.9.8) | `scope` (`config`, `resources`, `source`, `logs`; comma-separated), `path` (paths containing it; a `<mod>:<path>` copied from an answer works too), `env`. Files whose path matches the pattern are named even when their text does not (since 1.2.1). Without `logs` in the scope, an answer adds how many lines of the server's current log match (since 1.4.1). `source` searches the decompiled code of every loaded jar, named `<mod>:<path>`; while the background decompile after a sync is incomplete, answers say how many jars are done (since 1.3.0) |
 
 ## Guarantees
-- Read-only toward every environment source. Only `envx env sync`, `env import` and `project index` write the index.
+- Read-only toward every environment source. Only `sevli sync`, `env import` and `project index` write the index.
 - Folders in `denyRoots` (the data home's `config.json`) are never read. Synced text and log output pass a secret filter.
 - Mixins are *declared* (from mod jars); a mixin the server log shows failing to apply is marked `FAILED to apply`.

@@ -1,8 +1,8 @@
 {
-  "name": "envx-app",
-  "productName": "envx",
+  "name": "sevli-app",
+  "productName": "Sevli",
   "version": "0.1.0",
-  "description": "envx desktop app: pick supported Minecraft baselines and modpacks, and let your coding agents use them.",
+  "description": "sevli desktop app: pick supported Minecraft baselines and modpacks, and let your coding agents use them.",
   "license": "MIT",
   "private": true,
   "main": "dist/main/main.js",
@@ -29,8 +29,8 @@
     "react-dom": "^18.3.1"
   },
   "build": {
-    "appId": "dev.envx.app",
-    "productName": "envx",
+    "appId": "dev.sevli.app",
+    "productName": "Sevli",
     "directories": {
       "output": "release"
     },
@@ -57,14 +57,14 @@
       },
       {
         "from": "../LICENSE",
-        "to": "LICENSE.envx.txt"
+        "to": "LICENSE.sevli.txt"
       }
     ],
     "win": {
       "target": [
         "nsis"
       ],
-      "artifactName": "envx-setup-${version}.${ext}"
+      "artifactName": "Sevli-setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": true,
