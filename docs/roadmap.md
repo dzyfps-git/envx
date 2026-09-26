@@ -14,7 +14,7 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
 - **Measured, not assumed.** Every release passes tool-level checks; milestones are validated with paired agent runs
   (`bench/`).
 
-## Status: 1.5.0 (2026-09-25)
+## Status: 2.0.0 (2026-09-26)
 - 0.1–0.2: environment index, eight tools, `mod:` scoping, capped answers that name what they cut, measurement,
   an A/B switch for agents.
 - 0.3: history snapshots, `env import`, `env=<name>@<version>`, use-time auto-sync; empty results point to the past
@@ -44,22 +44,36 @@ modding projects with Claude Code and Codex as first-class tools. The design dec
   inherited Minecraft one (1 in 85 jars) are remapped with that member left under its runtime name instead of failing.
 - 1.4: trace mining (ADR 0012): `sevli insights` reads Codex and Claude Code session files in place and reports the
   shell work Sevli could have answered, what agents did right after an Sevli answer, answers that cost a follow-up and
-  slow calls. Everyday commands: `sevli` (status), `sevli on|off`, `sevli sync`, `sevli stop`, `sevli setup --path`.
+  slow calls (then `traces`). Everyday commands: `sevli` (status), `sevli on|off`, `sevli sync`, `sevli stop`, `sevli setup --path`.
   Code search reads one packed file per decompiled jar: a cold search on a spinning disk went from 21 s to 4 s.
   1.4.1, from the first trace report: resource search reads packed files too (cold 55 s -> 1.6 s); grep says when the
   server's current log has matching lines it did not search; `env filter` says it matches jar file names.
   1.4.2: a sync packs each new jar's resources as it extracts them (no background process needed for that).
   1.4.3: config texts are packed per snapshot; remapped jars are removed once their classes are decompiled (150 MB
-  on a large pack); `sevli insights` lists folders where agents worked without Sevli and whether they have Sevli's
+  on a large pack); the trace report lists folders where agents worked without Sevli and whether they have Sevli's
   instructions, and counts Forge/NeoForge work separately; first-run status shows the setup steps; the Loom cache is
   found through `GRADLE_USER_HOME`.
-- 1.5: the engine side of the desktop app (ADR 0013). `sevli browse` lists supported baselines and published packs
-  with sizes; `sevli add <id>` downloads a baseline from the official sources. Nothing is downloaded or
+- 1.5: the engine side of the desktop app (ADR 0013). `catalog` lists supported baselines and published packs
+  with sizes; `catalog install <id>` downloads a baseline from the official sources. Nothing is downloaded or
   created unasked: syncs no longer fetch a baseline by themselves, the Loom cache is no longer read, and the data
   home appears with the first install. Own servers are refused unless they run a supported baseline.
   `sevli app-server` is the app's JSON-lines connection.
+- 2.0: renamed from envx to Sevli. Existing data homes and agent connections carry over in place, each agent's on/off
+  unchanged. Commands are `sevli <verb>`: `browse`, `add`, `connect`, `list`, `sync`, `history`, `diff`, `stop`,
+  `on`/`off`, `setup`, `link`, `insights`, `info`, `check` (`sevli help advanced` for the rest); the forms from before
+  2.0 and the `envx` command keep working through 2.x.
 
-## Next: the desktop app (ADR 0013)
+## Next: supported-only indexing
+The public app indexes only what the maintainer has published as supported: exact jar versions (sha256) from
+published packs, listed in a signed, generated `supported.json` in the catalog. An own server needs a supported
+baseline, not a published pack; its other jars stay unindexed and are shown as coverage ("480 of 500 jars indexed"),
+and answers such as "no callers" say so while jars are unindexed. Nothing unapproved is indexed automatically: newly
+supported jars wait for the user's click. Configs and scripts refresh on their own without re-indexing jars. The
+maintainer's own install indexes everything and reviews what is not published yet. Support can be retired (keeps
+working where accepted) or revoked (hidden). Storage cleanup is optional, previewed and confirmed, and touches only
+Sevli's own data.
+
+## Then: the desktop app (ADR 0013)
 A Windows app that starts empty and offers a curated catalog: supported baselines and modpacks prepared by the
 maintainer, published as recipes (official download sources and hashes, never third-party files) and built on the
 user's PC. Milestones: packs (export tool, Modrinth, CurseForge, the user's own copy for blocked files), the Electron
